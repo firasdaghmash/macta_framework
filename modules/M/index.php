@@ -252,7 +252,7 @@ $conn = $db->getConnection();
                 <a href="../../index.php">MACTA Framework</a> > Process Modeling
             </div>
             <div>
-                <a href="#" class="btn btn-secondary">View Projects</a>
+                <a href="projects.php" class="btn btn-secondary">View Projects</a>
             </div>
         </div>
 
