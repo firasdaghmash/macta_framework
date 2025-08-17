@@ -82,34 +82,58 @@ $recentActivity = $stmt->fetchAll(PDO::FETCH_ASSOC);
         .hero-subtitle {
             font-size: 1.2em;
             opacity: 0.9;
+            margin-bottom: 25px;
+        }
+        
+        .hero-cta {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 12px 30px;
+            border-radius: 25px;
+            text-decoration: none;
+            color: white;
+            transition: all 0.3s ease;
+            border: 2px solid rgba(255,255,255,0.3);
+        }
+        
+        .hero-cta:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
+        
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
             margin-bottom: 30px;
         }
         
-        .quick-stats {
-            display: flex;
-            justify-content: center;
-            gap: 40px;
-            margin-top: 20px;
-        }
-        
-        .stat-item {
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
             text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-left: 4px solid #4CAF50;
         }
         
         .stat-number {
-            font-size: 2em;
+            font-size: 2.5em;
             font-weight: bold;
-            display: block;
+            color: #4CAF50;
+            margin-bottom: 10px;
         }
         
         .stat-label {
+            color: #666;
             font-size: 0.9em;
-            opacity: 0.8;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
         
-        .features-grid {
+        .feature-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
             gap: 25px;
             margin-bottom: 40px;
         }
@@ -118,39 +142,34 @@ $recentActivity = $stmt->fetchAll(PDO::FETCH_ASSOC);
             background: white;
             border-radius: 12px;
             padding: 30px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             transition: all 0.3s ease;
-            border: 1px solid #f0f0f0;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .feature-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-top: 4px solid transparent;
         }
         
         .feature-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
         }
+        
+        .feature-card:nth-child(1) { border-top-color: #4CAF50; }
+        .feature-card:nth-child(2) { border-top-color: #2196F3; }
+        .feature-card:nth-child(3) { border-top-color: #FF9800; }
+        .feature-card:nth-child(4) { border-top-color: #9C27B0; }
+        .feature-card:nth-child(5) { border-top-color: #F44336; }
+        .feature-card:nth-child(6) { border-top-color: #607D8B; }
         
         .feature-icon {
             font-size: 3em;
             margin-bottom: 20px;
-            display: block;
+            text-align: center;
         }
         
         .feature-title {
             font-size: 1.4em;
+            font-weight: 600;
             margin-bottom: 15px;
             color: #333;
-            font-weight: 600;
         }
         
         .feature-description {
@@ -167,25 +186,23 @@ $recentActivity = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         .btn-feature {
             padding: 10px 20px;
-            border: none;
             border-radius: 6px;
             text-decoration: none;
             font-weight: 500;
-            transition: all 0.2s;
+            transition: all 0.3s ease;
+            border: none;
             cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
+            font-size: 14px;
         }
         
         .btn-primary {
-            background: linear-gradient(135deg, #667eea, #764ba2);
+            background: linear-gradient(45deg, #4CAF50, #45a049);
             color: white;
         }
         
         .btn-primary:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
         }
         
         .btn-secondary {
@@ -196,210 +213,215 @@ $recentActivity = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         .btn-secondary:hover {
             background: #e9ecef;
-        }
-        
-        .workflow-section {
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 30px;
-            margin-bottom: 30px;
-        }
-        
-        .workflow-title {
-            text-align: center;
-            margin-bottom: 30px;
-            color: #333;
-        }
-        
-        .workflow-steps {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            max-width: 1000px;
-            margin: 0 auto;
-            flex-wrap: wrap;
-            gap: 20px;
-        }
-        
-        .workflow-step {
-            text-align: center;
-            flex: 1;
-            min-width: 150px;
-        }
-        
-        .step-number {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 1.2em;
-            margin: 0 auto 15px;
-        }
-        
-        .step-title {
-            font-weight: 600;
-            margin-bottom: 8px;
-            color: #333;
-        }
-        
-        .step-description {
-            font-size: 0.9em;
-            color: #666;
-        }
-        
-        .workflow-arrow {
-            font-size: 1.5em;
-            color: #ccc;
-            margin: 0 10px;
+            transform: translateY(-2px);
         }
         
         .recent-activity {
             background: white;
             border-radius: 12px;
-            padding: 25px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            padding: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-top: 30px;
+        }
+        
+        .activity-title {
+            font-size: 1.4em;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #333;
         }
         
         .activity-item {
+            padding: 15px 0;
+            border-bottom: 1px solid #eee;
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            padding: 12px 0;
-            border-bottom: 1px solid #f0f0f0;
         }
         
         .activity-item:last-child {
             border-bottom: none;
         }
         
-        .activity-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: #e3f2fd;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 15px;
-            font-size: 1.2em;
-        }
-        
-        .activity-content {
-            flex: 1;
-        }
-        
-        .activity-title {
-            font-weight: 500;
+        .activity-info h4 {
+            margin: 0 0 5px 0;
             color: #333;
         }
         
-        .activity-time {
-            font-size: 0.85em;
+        .activity-info p {
+            margin: 0;
             color: #666;
+            font-size: 0.9em;
         }
         
-        @media (max-width: 768px) {
-            .workflow-steps {
-                flex-direction: column;
-            }
-            
-            .workflow-arrow {
-                transform: rotate(90deg);
-                margin: 10px 0;
-            }
-            
-            .quick-stats {
-                flex-wrap: wrap;
-                gap: 20px;
-            }
-            
-            .hero-title {
-                font-size: 2em;
-            }
+        .activity-type {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+        
+        .type-process {
+            background: #e8f5e8;
+            color: #4CAF50;
+        }
+        
+        .type-simulation {
+            background: #e3f2fd;
+            color: #2196F3;
+        }
+        
+        .back-button {
+            display: inline-block;
+            margin-bottom: 20px;
+            padding: 10px 20px;
+            background: #6c757d;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+        }
+        
+        .back-button:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
+        }
+        
+        .workflow-guide {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .workflow-steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .workflow-step {
+            text-align: center;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            position: relative;
+        }
+        
+        .step-number {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            background: #4CAF50;
+            color: white;
+            border-radius: 50%;
+            line-height: 40px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        
+        .keyboard-shortcuts {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #333;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 0.8em;
+            opacity: 0.8;
+            z-index: 1000;
+        }
+        
+        .keyboard-shortcuts h5 {
+            margin: 0 0 10px 0;
+        }
+        
+        .shortcut {
+            margin: 5px 0;
+        }
+        
+        .key {
+            background: #555;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="container">
-            <div class="breadcrumb">
-                <a href="../../index.php">MACTA Framework</a> > Process Modeling
-            </div>
-            <div>
-                <a href="projects.php" class="btn btn-secondary">📋 View Projects</a>
-                <a href="dashboard.php" class="btn btn-primary">📊 Dashboard</a>
-            </div>
-        </div>
-    </div>
-
     <div class="container">
+        <a href="../../index.php" class="back-button">← Back to MACTA Framework</a>
+        
         <!-- Hero Section -->
         <div class="module-hero">
             <div class="hero-content">
-                <h1 class="hero-title">🔄 Process Modeling & Simulation</h1>
-                <p class="hero-subtitle">
-                    Model, analyze, and optimize your business processes with advanced simulation capabilities
-                </p>
-                
-                <div class="quick-stats">
-                    <div class="stat-item">
-                        <span class="stat-number"><?php echo $stats['totalProcesses']; ?></span>
-                        <span class="stat-label">Active Processes</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-number"><?php echo $stats['totalSimulations']; ?></span>
-                        <span class="stat-label">Simulations Run</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-number"><?php echo $stats['totalResources']; ?></span>
-                        <span class="stat-label">Available Resources</span>
-                    </div>
-                </div>
+                <h1 class="hero-title">🎯 Process Modeling</h1>
+                <p class="hero-subtitle">Design, simulate, and optimize your business processes with advanced modeling tools</p>
+                <a href="visual_builder.php" class="hero-cta">🚀 Start Building Processes</a>
             </div>
         </div>
 
-        <!-- Workflow Overview -->
-        <div class="workflow-section">
-            <h2 class="workflow-title">🎯 Complete Process Optimization Workflow</h2>
+        <!-- Quick Stats -->
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-number"><?= $stats['totalProcesses'] ?></div>
+                <div class="stat-label">Total Processes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number"><?= $stats['totalSimulations'] ?></div>
+                <div class="stat-label">Simulations Run</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number"><?= $stats['totalResources'] ?></div>
+                <div class="stat-label">Resources Available</div>
+            </div>
+        </div>
+
+        <!-- Workflow Guide -->
+        <div class="workflow-guide">
+            <h3>🗺️ Process Optimization Workflow</h3>
+            <p>Follow this proven workflow to maximize your process improvement results:</p>
             <div class="workflow-steps">
                 <div class="workflow-step">
                     <div class="step-number">1</div>
-                    <div class="step-title">Model</div>
-                    <div class="step-description">Create visual process diagrams using BPMN standards</div>
+                    <h4>Design</h4>
+                    <p>Create visual process models</p>
                 </div>
-                <div class="workflow-arrow">→</div>
                 <div class="workflow-step">
                     <div class="step-number">2</div>
-                    <div class="step-title">Configure</div>
-                    <div class="step-description">Assign resources, time, and costs to each step</div>
+                    <h4>Resources</h4>
+                    <p>Configure required resources</p>
                 </div>
-                <div class="workflow-arrow">→</div>
                 <div class="workflow-step">
                     <div class="step-number">3</div>
-                    <div class="step-title">Simulate</div>
-                    <div class="step-description">Run multiple scenarios to identify bottlenecks</div>
+                    <h4>Simulate</h4>
+                    <p>Run multiple scenarios</p>
                 </div>
-                <div class="workflow-arrow">→</div>
                 <div class="workflow-step">
                     <div class="step-number">4</div>
-                    <div class="step-title">Optimize</div>
-                    <div class="step-description">Implement improvements based on simulation results</div>
+                    <h4>Analyze</h4>
+                    <p>Review performance metrics</p>
+                </div>
+                <div class="workflow-step">
+                    <div class="step-number">5</div>
+                    <h4>Optimize</h4>
+                    <p>Implement improvements</p>
                 </div>
             </div>
         </div>
 
-        <!-- Main Features -->
-        <div class="features-grid">
+        <!-- Feature Cards -->
+        <div class="feature-grid">
             <!-- Visual Process Builder -->
             <div class="feature-card">
                 <div class="feature-icon">🎨</div>
                 <h3 class="feature-title">Visual Process Builder</h3>
                 <p class="feature-description">
-                    Create comprehensive business process diagrams with our intuitive drag-and-drop BPMN editor. 
+                    Create stunning process diagrams with drag-and-drop functionality. 
                     Design workflows, define decision points, and map complex business logic visually.
                 </p>
                 <div class="feature-actions">
@@ -466,228 +488,122 @@ $recentActivity = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 </div>
             </div>
 
-            <!-- Process Documentation -->
+            <!-- AI-Powered Optimization -->
             <div class="feature-card">
-                <div class="feature-icon">📚</div>
-                <h3 class="feature-title">Documentation & Compliance</h3>
-                <p class="feature-description">
-                    Generate comprehensive process documentation, standard operating procedures, and compliance reports. 
-                    Export to multiple formats and maintain version control.
-                </p>
-                <div class="feature-actions">
-                    <a href="documentation.php" class="btn-feature btn-primary">
-                        📝 Create Docs
-                    </a>
-                    <a href="compliance.php" class="btn-feature btn-secondary">
-                        ✅ Compliance
-                    </a>
-                </div>
-            </div>
-
-            <!-- Process Optimization -->
-            <div class="feature-card">
-                <div class="feature-icon">🎯</div>
+                <div class="feature-icon">🤖</div>
                 <h3 class="feature-title">AI-Powered Optimization</h3>
                 <p class="feature-description">
                     Leverage artificial intelligence to identify optimization opportunities, suggest process improvements, 
                     and predict performance outcomes based on historical data and industry best practices.
                 </p>
                 <div class="feature-actions">
-                    <a href="optimization.php" class="btn-feature btn-primary">
+                    <a href="AI_opt.php" class="btn-feature btn-primary">
                         🤖 Optimize Now
                     </a>
-                    <a href="recommendations.php" class="btn-feature btn-secondary">
+                    <a href="AI_opt.php#recommendations" class="btn-feature btn-secondary">
                         💡 Get Suggestions
+                    </a>
+                </div>
+            </div>
+
+            <!-- Documentation & Compliance -->
+            <div class="feature-card">
+                <div class="feature-icon">📚</div>
+                <h3 class="feature-title">Documentation & Compliance</h3>
+                <p class="feature-description">
+                    Generate comprehensive process documentation, standard operating procedures, and compliance reports. 
+                    Export to multiple formats and maintain version control with automated workflows.
+                </p>
+                <div class="feature-actions">
+                    <a href="docs.php" class="btn-feature btn-primary">
+                        📝 Create Docs
+                    </a>
+                    <a href="docs.php#compliance" class="btn-feature btn-secondary">
+                        ✅ Compliance
                     </a>
                 </div>
             </div>
         </div>
 
         <!-- Recent Activity -->
+        <?php if (!empty($recentActivity)): ?>
         <div class="recent-activity">
-            <h3 style="margin-bottom: 20px;">🕒 Recent Activity</h3>
-            <?php if (empty($recentActivity)): ?>
-                <div style="text-align: center; color: #666; padding: 20px;">
-                    <p>No recent activity. Start by creating your first process!</p>
-                    <a href="visual_builder.php" class="btn-feature btn-primary" style="margin-top: 10px;">
-                        🚀 Create Process
-                    </a>
-                </div>
-            <?php else: ?>
-                <?php foreach ($recentActivity as $activity): ?>
-                    <div class="activity-item">
-                        <div class="activity-icon">
-                            <?php echo $activity['type'] === 'process' ? '🔄' : '⚡'; ?>
-                        </div>
-                        <div class="activity-content">
-                            <div class="activity-title">
-                                <?php echo htmlspecialchars($activity['activity']); ?>: 
-                                <strong><?php echo htmlspecialchars($activity['name']); ?></strong>
-                            </div>
-                            <div class="activity-time">
-                                <?php echo timeAgo($activity['created_at']); ?>
-                            </div>
-                        </div>
+            <h3 class="activity-title">🕒 Recent Activity</h3>
+            <?php foreach ($recentActivity as $activity): ?>
+                <div class="activity-item">
+                    <div class="activity-info">
+                        <h4><?= htmlspecialchars($activity['name'] ?? 'Unknown') ?></h4>
+                        <p><?= htmlspecialchars($activity['activity']) ?> • <?= date('M j, Y', strtotime($activity['created_at'])) ?></p>
                     </div>
-                <?php endforeach; ?>
-            <?php endif; ?>
+                    <div class="activity-type type-<?= $activity['type'] ?>">
+                        <?= ucfirst($activity['type']) ?>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+        <?php else: ?>
+        <div class="recent-activity">
+            <h3 class="activity-title">🕒 Recent Activity</h3>
+            <div style="text-align: center; padding: 40px; color: #666;">
+                <p>No recent activity. Start by creating your first process model!</p>
+                <a href="visual_builder.php" class="btn-feature btn-primary">🎨 Create Process</a>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <!-- Keyboard Shortcuts -->
+        <div class="keyboard-shortcuts">
+            <h5>⌨️ Shortcuts</h5>
+            <div class="shortcut"><span class="key">Ctrl+B</span> - Process Builder</div>
+            <div class="shortcut"><span class="key">Ctrl+S</span> - Run Simulation</div>
+            <div class="shortcut"><span class="key">Ctrl+R</span> - Manage Resources</div>
+            <div class="shortcut"><span class="key">Ctrl+D</span> - Dashboard</div>
         </div>
     </div>
 
     <script>
-        // Add some interactive elements
-        document.addEventListener('DOMContentLoaded', function() {
-            // Animate stats on scroll
-            const observerOptions = {
-                threshold: 0.1,
-                rootMargin: '0px 0px -50px 0px'
-            };
-
-            const observer = new IntersectionObserver(function(entries) {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        entry.target.style.opacity = '1';
-                        entry.target.style.transform = 'translateY(0)';
-                    }
-                });
-            }, observerOptions);
-
-            // Observe all feature cards
-            document.querySelectorAll('.feature-card').forEach(card => {
-                card.style.opacity = '0';
-                card.style.transform = 'translateY(20px)';
-                card.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
-                observer.observe(card);
-            });
-
-            // Add keyboard shortcuts
-            document.addEventListener('keydown', function(e) {
-                if (e.ctrlKey || e.metaKey) {
-                    switch(e.key) {
-                        case 'b':
-                            e.preventDefault();
-                            window.location.href = 'visual_builder.php';
-                            break;
-                        case 's':
-                            e.preventDefault();
-                            window.location.href = 'simulation.php';
-                            break;
-                        case 'd':
-                            e.preventDefault();
-                            window.location.href = 'dashboard.php';
-                            break;
-                        case 'r':
-                            e.preventDefault();
-                            window.location.href = 'resources.php';
-                            break;
-                    }
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey) {
+                switch(e.key) {
+                    case 'b':
+                        e.preventDefault();
+                        window.location.href = 'visual_builder.php';
+                        break;
+                    case 's':
+                        e.preventDefault();
+                        window.location.href = 'simulation.php';
+                        break;
+                    case 'r':
+                        e.preventDefault();
+                        window.location.href = 'resources.php';
+                        break;
+                    case 'd':
+                        e.preventDefault();
+                        window.location.href = 'dashboard.php';
+                        break;
                 }
+            }
+        });
+
+        // Add hover effects
+        document.querySelectorAll('.feature-card').forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-5px)';
             });
-
-            // Add tooltips for keyboard shortcuts
-            const shortcuts = [
-                { selector: 'a[href="visual_builder.php"]', shortcut: 'Ctrl+B' },
-                { selector: 'a[href="simulation.php"]', shortcut: 'Ctrl+S' },
-                { selector: 'a[href="dashboard.php"]', shortcut: 'Ctrl+D' },
-                { selector: 'a[href="resources.php"]', shortcut: 'Ctrl+R' }
-            ];
-
-            shortcuts.forEach(item => {
-                const elements = document.querySelectorAll(item.selector);
-                elements.forEach(el => {
-                    el.title = `${el.textContent.trim()} (${item.shortcut})`;
-                });
-            });
-
-            // Add click tracking for analytics
-            document.querySelectorAll('.btn-feature').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const action = this.textContent.trim();
-                    const card = this.closest('.feature-card');
-                    const feature = card ? card.querySelector('.feature-title').textContent : 'Unknown';
-                    
-                    // You could send this to an analytics service
-                    console.log('Feature clicked:', { feature, action });
-                });
+            
+            card.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateY(0)';
             });
         });
 
-        // Add a simple notification system for quick feedback
-        function showNotification(message, type = 'info') {
-            const notification = document.createElement('div');
-            notification.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                padding: 15px 20px;
-                background: ${type === 'success' ? '#d4edda' : type === 'error' ? '#f8d7da' : '#d1ecf1'};
-                color: ${type === 'success' ? '#155724' : type === 'error' ? '#721c24' : '#0c5460'};
-                border: 1px solid ${type === 'success' ? '#c3e6cb' : type === 'error' ? '#f5c6cb' : '#b6d4fe'};
-                border-radius: 6px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-                z-index: 1000;
-                max-width: 300px;
-                font-size: 14px;
-                transform: translateX(100%);
-                transition: transform 0.3s ease;
-            `;
-            notification.textContent = message;
-            
-            document.body.appendChild(notification);
-            
-            // Animate in
-            setTimeout(() => {
-                notification.style.transform = 'translateX(0)';
-            }, 100);
-            
-            // Remove after 3 seconds
-            setTimeout(() => {
-                notification.style.transform = 'translateX(100%)';
-                setTimeout(() => {
-                    if (notification.parentNode) {
-                        notification.parentNode.removeChild(notification);
-                    }
-                }, 300);
-            }, 3000);
-        }
-
-        // Check if we're coming from a successful action
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('success')) {
-            const action = urlParams.get('action');
-            let message = 'Action completed successfully!';
-            
-            switch(action) {
-                case 'process_created':
-                    message = 'Process created successfully! 🎉';
-                    break;
-                case 'simulation_completed':
-                    message = 'Simulation completed successfully! 📊';
-                    break;
-                case 'resource_added':
-                    message = 'Resource added successfully! 👥';
-                    break;
+        // Hide shortcuts after 10 seconds
+        setTimeout(() => {
+            const shortcuts = document.querySelector('.keyboard-shortcuts');
+            if (shortcuts) {
+                shortcuts.style.opacity = '0.3';
             }
-            
-            showNotification(message, 'success');
-            
-            // Clean up URL
-            window.history.replaceState({}, document.title, window.location.pathname);
-        }
+        }, 10000);
     </script>
 </body>
 </html>
-
-<?php
-// Helper function for time ago
-function timeAgo($datetime) {
-    $time = time() - strtotime($datetime);
-    
-    if ($time < 60) return 'Just now';
-    if ($time < 3600) return floor($time/60) . ' minutes ago';
-    if ($time < 86400) return floor($time/3600) . ' hours ago';
-    if ($time < 2629746) return floor($time/86400) . ' days ago';
-    
-    return date('M j, Y', strtotime($datetime));
-}
-?>
