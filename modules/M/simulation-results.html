@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MACTA Framework - Simulation Results</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(45deg, #28a745, #20c997);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .nav-breadcrumb {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .nav-breadcrumb a {
+            color: #28a745;
+            text-decoration: none;
+        }
+
+        .nav-breadcrumb a:hover {
+            text-decoration: underline;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .simulation-controls {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .controls-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .controls-header h2 {
+            color: #2c3e50;
+            margin-bottom: 0;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0.25rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        }
+
+        .btn-secondary {
+            background: #f8f9fa;
+            color: #495057;
+            border: 1px solid #dee2e6;
+        }
+
+        .btn-info {
+            background: linear-gradient(45deg, #17a2b8, #6f42c1);
+            color: white;
+        }
+
+        .simulation-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-label {
+            font-weight: 500;
+            color: #495057;
+            margin-bottom: 0.5rem;
+        }
+
+        .form-input {
+            padding: 0.5rem;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #28a745;
+            box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.2);
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .results-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .card-header h3 {
+            color: #2c3e50;
+            font-size: 1.1rem;
+            margin: 0;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .metric-item {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 4px solid #28a745;
+        }
+
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #28a745;
+            display: block;
+        }
+
+        .metric-label {
+            font-size: 0.8rem;
+            color: #6c757d;
+            margin-top: 0.25rem;
+        }
+
+        .chart-container {
+            height: 300px;
+            position: relative;
+            margin-top: 1rem;
+        }
+
+        .process-steps {
+            grid-column: 1 / -1;
+        }
+
+        .steps-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        .steps-table th,
+        .steps-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .steps-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .steps-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .status-optimal {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-critical {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 0.5rem 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(45deg, #28a745, #20c997);
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+
+        .comparison-section {
+            grid-column: 1 / -1;
+            margin-top: 1rem;
+        }
+
+        .comparison-toggle {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .toggle-btn {
+            padding: 0.5rem 1rem;
+            border: 1px solid #dee2e6;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .toggle-btn.active {
+            background: #28a745;
+            color: white;
+            border-color: #28a745;
+        }
+
+        .simulation-progress {
+            background: #e9ecef;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            text-align: center;
+            display: none;
+        }
+
+        .spinner {
+            width: 30px;
+            height: 30px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #28a745;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .alert {
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            border: 1px solid transparent;
+        }
+
+        .alert-success {
+            color: #155724;
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+
+        .alert-info {
+            color: #0c5460;
+            background-color: #d1ecf1;
+            border-color: #bee5eb;
+        }
+
+        @media (max-width: 768px) {
+            .results-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .simulation-form {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+    <!-- Include Chart.js for visualization -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">S</div>
+                <div>
+                    <h1>MACTA Framework - Simulation Results</h1>
+                    <div class="nav-breadcrumb">
+                        <a href="../../../index.php">MACTA</a> / <a href="../index.php">Modeling</a> / Simulation Results
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="simulation-controls">
+            <div class="controls-header">
+                <h2>🎯 Process Simulation</h2>
+            </div>
+            
+            <div class="simulation-form">
+                <div class="form-group">
+                    <label class="form-label">Process Name</label>
+                    <select class="form-input" id="processSelect">
+                        <option value="customer-onboarding">Customer Onboarding Process</option>
+                        <option value="order-processing">Order Processing Workflow</option>
+                        <option value="employee-training">Employee Training Program</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Simulation Duration (days)</label>
+                    <input type="number" class="form-input" id="simulationDays" value="30" min="1" max="365">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Number of Instances</label>
+                    <input type="number" class="form-input" id="instanceCount" value="100" min="1" max="10000">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Scenario Type</label>
+                    <select class="form-input" id="scenarioType">
+                        <option value="current">Current State</option>
+                        <option value="optimized">Optimized</option>
+                        <option value="future">Future State</option>
+                        <option value="comparison">Compare All</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div>
+                <button class="btn btn-primary" onclick="runSimulation()">
+                    ▶️ Run Simulation
+                </button>
+                <button class="btn btn-secondary" onclick="loadSampleResults()">
+                    📊 Load Sample Results
+                </button>
+                <button class="btn btn-info" onclick="exportResults()">
+                    📤 Export Results
+                </button>
+            </div>
+        </div>
+
+        <div class="simulation-progress" id="simulationProgress">
+            <div class="spinner"></div>
+            <div>Running simulation... This may take a few moments.</div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <div id="resultsContainer" style="display: none;">
+            <div class="alert alert-success">
+                <strong>✅ Simulation Complete!</strong> Results generated successfully for Customer Onboarding Process.
+            </div>
+
+            <div class="results-grid">
+                <div class="results-card">
+                    <div class="card-header">
+                        <span>📊</span>
+                        <h3>Key Performance Metrics</h3>
+                    </div>
+                    <div class="metrics-grid">
+                        <div class="metric-item">
+                            <span class="metric-value" id="avgProcessTime">4.2</span>
+                            <div class="metric-label">Avg Process Time (days)</div>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-value" id="throughput">89</span>
+                            <div class="metric-label">Throughput (%)</div>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-value" id="totalCost">$2,840</span>
+                            <div class="metric-label">Total Cost</div>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-value" id="efficiency">92%</span>
+                            <div class="metric-label">Efficiency Score</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="results-card">
+                    <div class="card-header">
+                        <span>📈</span>
+                        <h3>Process Timeline</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="timelineChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="results-card">
+                    <div class="card-header">
+                        <span>🎯</span>
+                        <h3>Resource Utilization</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="resourceChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="results-card">
+                    <div class="card-header">
+                        <span>💰</span>
+                        <h3>Cost Breakdown</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="costChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="results-card process-steps">
+                    <div class="card-header">
+                        <span>🔄</span>
+                        <h3>Process Step Analysis</h3>
+                    </div>
+                    
+                    <table class="steps-table">
+                        <thead>
+                            <tr>
+                                <th>Step Name</th>
+                                <th>Avg Duration</th>
+                                <th>Cost</th>
+                                <th>Utilization</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Customer Inquiry Review</td>
+                                <td>2.3 hours</td>
+                                <td>$45</td>
+                                <td>78%</td>
+                                <td><span class="status-badge status-optimal">Optimal</span></td>
+                            </tr>
+                            <tr>
+                                <td>Document Verification</td>
+                                <td>4.1 hours</td>
+                                <td>$82</td>
+                                <td>65%</td>
+                                <td><span class="status-badge status-warning">Review Needed</span></td>
+                            </tr>
+                            <tr>
+                                <td>Account Setup</td>
+                                <td>1.8 hours</td>
+                                <td>$36</td>
+                                <td>92%</td>
+                                <td><span class="status-badge status-optimal">Optimal</span></td>
+                            </tr>
+                            <tr>
+                                <td>Approval Process</td>
+                                <td>6.2 hours</td>
+                                <td>$124</td>
+                                <td>45%</td>
+                                <td><span class="status-badge status-critical">Bottleneck</span></td>
+                            </tr>
+                            <tr>
+                                <td>Welcome Email</td>
+                                <td>0.2 hours</td>
+                                <td>$4</td>
+                                <td>98%</td>
+                                <td><span class="status-badge status-optimal">Optimal</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="results-card comparison-section">
+                    <div class="card-header">
+                        <span>⚖️</span>
+                        <h3>Scenario Comparison</h3>
+                    </div>
+                    
+                    <div class="comparison-toggle">
+                        <button class="toggle-btn active" onclick="showComparison('current')">Current State</button>
+                        <button class="toggle-btn" onclick="showComparison('optimized')">Optimized</button>
+                        <button class="toggle-btn" onclick="showComparison('future')">Future State</button>
+                    </div>
+                    
+                    <div class="chart-container">
+                        <canvas id="comparisonChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let timelineChart, resourceChart, costChart, comparisonChart;
+        
+        // Sample simulation data - in real app this would come from your database
+        const simulationData = {
+            'customer-onboarding': {
+                avgProcessTime: 4.2,
+                throughput: 89,
+                totalCost: 2840,
+                efficiency: 92,
+                timeline: {
+                    labels: ['Day 1', 'Day 7', 'Day 14', 'Day 21', 'Day 28'],
+                    current: [12, 45, 78, 89, 95],
+                    optimized: [15, 52, 85, 94, 98],
+                    future: [18, 58, 88, 96, 99]
+                },
+                resources: {
+                    labels: ['CS Team', 'Verification', 'IT Setup', 'Management'],
+                    utilization: [78, 65, 92, 45],
+                    capacity: [100, 100, 100, 100]
+                },
+                costs: {
+                    labels: ['Labor', 'Technology', 'Processing', 'Management'],
+                    values: [1420, 680, 520, 220]
+                }
+            },
+            'order-processing': {
+                avgProcessTime: 2.8,
+                throughput: 94,
+                totalCost: 1650,
+                efficiency: 87,
+                timeline: {
+                    labels: ['Day 1', 'Day 7', 'Day 14', 'Day 21', 'Day 28'],
+                    current: [18, 52, 78, 88, 94],
+                    optimized: [22, 58, 84, 92, 97],
+                    future: [25, 62, 87, 95, 98]
+                },
+                resources: {
+                    labels: ['Sales', 'Inventory', 'Shipping', 'Support'],
+                    utilization: [85, 72, 88, 56],
+                    capacity: [100, 100, 100, 100]
+                },
+                costs: {
+                    labels: ['Personnel', 'Shipping', 'Packaging', 'Systems'],
+                    values: [742, 495, 248, 165]
+                }
+            }
+        };
+
+        function runSimulation() {
+            const processName = document.getElementById('processSelect').value;
+            const days = document.getElementById('simulationDays').value;
+            const instances = document.getElementById('instanceCount').value;
+            const scenario = document.getElementById('scenarioType').value;
+            
+            // Show progress
+            document.getElementById('simulationProgress').style.display = 'block';
+            document.getElementById('resultsContainer').style.display = 'none';
+            
+            // Simulate progress
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += Math.random() * 20;
+                if (progress > 100) progress = 100;
+                
+                document.getElementById('progressFill').style.width = progress + '%';
+                
+                if (progress >= 100) {
+                    clearInterval(progressInterval);
+                    setTimeout(() => {
+                        showResults(processName);
+                    }, 500);
+                }
+            }, 300);
+        }
+
+        function loadSampleResults() {
+            showResults('customer-onboarding');
+        }
+
+        function showResults(processKey) {
+            document.getElementById('simulationProgress').style.display = 'none';
+            document.getElementById('resultsContainer').style.display = 'block';
+            
+            const data = simulationData[processKey] || simulationData['customer-onboarding'];
+            
+            // Update metrics
+            document.getElementById('avgProcessTime').textContent = data.avgProcessTime;
+            document.getElementById('throughput').textContent = data.throughput;
+            document.getElementById('totalCost').textContent = '$' + data.totalCost.toLocaleString();
+            document.getElementById('efficiency').textContent = data.efficiency + '%';
+            
+            // Create charts
+            createTimelineChart(data.timeline);
+            createResourceChart(data.resources);
+            createCostChart(data.costs);
+            createComparisonChart(data);
+            
+            // Scroll to results
+            document.getElementById('resultsContainer').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function createTimelineChart(timeline) {
+            const ctx = document.getElementById('timelineChart').getContext('2d');
+            
+            if (timelineChart) {
+                timelineChart.destroy();
+            }
+            
+            timelineChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: timeline.labels,
+                    datasets: [{
+                        label: 'Process Completion %',
+                        data: timeline.current,
+                        borderColor: '#28a745',
+                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createResourceChart(resources) {
+            const ctx = document.getElementById('resourceChart').getContext('2d');
+            
+            if (resourceChart) {
+                resourceChart.destroy();
+            }
+            
+            resourceChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: resources.labels,
+                    datasets: [{
+                        label: 'Utilization %',
+                        data: resources.utilization,
+                        backgroundColor: [
+                            'rgba(40, 167, 69, 0.8)',
+                            'rgba(255, 193, 7, 0.8)',
+                            'rgba(23, 162, 184, 0.8)',
+                            'rgba(220, 53, 69, 0.8)'
+                        ],
+                        borderColor: [
+                            '#28a745',
+                            '#ffc107',
+                            '#17a2b8',
+                            '#dc3545'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createCostChart(costs) {
+            const ctx = document.getElementById('costChart').getContext('2d');
+            
+            if (costChart) {
+                costChart.destroy();
+            }
+            
+            costChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: costs.labels,
+                    datasets: [{
+                        data: costs.values,
+                        backgroundColor: [
+                            '#28a745',
+                            '#17a2b8',
+                            '#ffc107',
+                            '#6f42c1'
+                        ],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        function createComparisonChart(data) {
+            const ctx = document.getElementById('comparisonChart').getContext('2d');
+            
+            if (comparisonChart) {
+                comparisonChart.destroy();
+            }
+            
+            comparisonChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.timeline.labels,
+                    datasets: [{
+                        label: 'Current State',
+                        data: data.timeline.current,
+                        borderColor: '#dc3545',
+                        backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                        tension: 0.4
+                    }, {
+                        label: 'Optimized',
+                        data: data.timeline.optimized,
+                        borderColor: '#ffc107',
+                        backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                        tension: 0.4
+                    }, {
+                        label: 'Future State',
+                        data: data.timeline.future,
+                        borderColor: '#28a745',
+                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function showComparison(scenario) {
+            // Update toggle buttons
+            document.querySelectorAll('.toggle-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Update comparison chart based on scenario
+            // This would filter the comparison chart data
+            console.log('Showing comparison for:', scenario);
+        }
+
+        function exportResults() {
+            // Create a simple CSV export
+            const processName = document.getElementById('processSelect').options[document.getElementById('processSelect').selectedIndex].text;
+            const csvContent = [
+                ['Metric', 'Value'],
+                ['Process Name', processName],
+                ['Average Process Time', document.getElementById('avgProcessTime').textContent + ' days'],
+                ['Throughput', document.getElementById('throughput').textContent + '%'],
+                ['Total Cost', document.getElementById('totalCost').textContent],
+                ['Efficiency Score', document.getElementById('efficiency').textContent],
+                ['Export Date', new Date().toLocaleString()]
+            ].map(row => row.join(',')).join('\n');
+            
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `simulation_results_${Date.now()}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+
+        // Initialize with sample results on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Auto-load sample results after a short delay
+            setTimeout(() => {
+                loadSampleResults();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

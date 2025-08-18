@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MACTA Framework - Process Modeler</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(45deg, #FF6B35, #F7941D);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .nav-breadcrumb {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .nav-breadcrumb a {
+            color: #FF6B35;
+            text-decoration: none;
+        }
+
+        .nav-breadcrumb a:hover {
+            text-decoration: underline;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .toolbar {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #FF6B35, #F7941D);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+        }
+
+        .btn-secondary {
+            background: #f8f9fa;
+            color: #495057;
+            border: 1px solid #dee2e6;
+        }
+
+        .btn-secondary:hover {
+            background: #e9ecef;
+            transform: translateY(-1px);
+        }
+
+        .btn-success {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        }
+
+        .btn-info {
+            background: linear-gradient(45deg, #17a2b8, #6f42c1);
+            color: white;
+        }
+
+        .btn-info:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(23, 162, 184, 0.3);
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 1rem;
+            height: calc(100vh - 200px);
+        }
+
+        .modeler-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .sidebar {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            padding: 1rem;
+            overflow-y: auto;
+        }
+
+        .sidebar h3 {
+            color: #2c3e50;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .process-list {
+            list-style: none;
+        }
+
+        .process-item {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-left: 4px solid transparent;
+        }
+
+        .process-item:hover {
+            background: #e9ecef;
+            border-left-color: #FF6B35;
+            transform: translateX(4px);
+        }
+
+        .process-item.active {
+            background: linear-gradient(45deg, rgba(255, 107, 53, 0.1), rgba(247, 148, 29, 0.1));
+            border-left-color: #FF6B35;
+        }
+
+        .process-name {
+            font-weight: 500;
+            color: #2c3e50;
+            margin-bottom: 0.25rem;
+        }
+
+        .process-date {
+            font-size: 0.8rem;
+            color: #6c757d;
+        }
+
+        .properties-panel {
+            margin-top: 2rem;
+        }
+
+        .property-group {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .property-label {
+            font-weight: 500;
+            color: #495057;
+            margin-bottom: 0.5rem;
+        }
+
+        .property-input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        .property-input:focus {
+            outline: none;
+            border-color: #FF6B35;
+            box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.2);
+        }
+
+        #bpmn-container {
+            width: 100%;
+            height: 100%;
+            min-height: 500px;
+        }
+
+        .status-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(248, 249, 250, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 0.5rem 1rem;
+            border-top: 1px solid #dee2e6;
+            font-size: 0.8rem;
+            color: #6c757d;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .zoom-controls {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .zoom-btn {
+            width: 30px;
+            height: 30px;
+            border: 1px solid #dee2e6;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        .zoom-btn:hover {
+            background: #f8f9fa;
+            border-color: #FF6B35;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 300px;
+            font-size: 1.1rem;
+            color: #6c757d;
+        }
+
+        .spinner {
+            width: 30px;
+            height: 30px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #FF6B35;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .alert {
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            border: 1px solid transparent;
+        }
+
+        .alert-success {
+            color: #155724;
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+
+        .alert-error {
+            color: #721c24;
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                grid-template-rows: 1fr auto;
+            }
+            
+            .sidebar {
+                height: 300px;
+            }
+            
+            .toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .toolbar .btn {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">M</div>
+                <div>
+                    <h1>MACTA Framework - Process Modeler</h1>
+                    <div class="nav-breadcrumb">
+                        <a href="../../../index.php">MACTA</a> / <a href="../index.php">Modeling</a> / BPMN Modeler
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="toolbar">
+            <button class="btn btn-primary" onclick="createNewProcess()">
+                ➕ New Process
+            </button>
+            <button class="btn btn-success" onclick="saveProcess()">
+                💾 Save Process
+            </button>
+            <button class="btn btn-secondary" onclick="loadSampleProcess()">
+                📄 Load Sample
+            </button>
+            <button class="btn btn-info" onclick="simulateProcess()">
+                ▶️ Simulate
+            </button>
+            <button class="btn btn-secondary" onclick="exportProcess()">
+                📤 Export BPMN
+            </button>
+            <button class="btn btn-secondary" onclick="importProcess()">
+                📥 Import BPMN
+            </button>
+            <input type="file" id="fileInput" accept=".bpmn,.xml" style="display: none;" onchange="handleFileImport(event)">
+        </div>
+
+        <div id="alerts"></div>
+
+        <div class="main-content">
+            <div class="modeler-container">
+                <div id="bpmn-container">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        Loading BPMN Modeler...
+                    </div>
+                </div>
+                <div class="status-bar">
+                    <div>
+                        <span id="status-text">Ready</span> | 
+                        Elements: <span id="element-count">0</span>
+                    </div>
+                    <div class="zoom-controls">
+                        <button class="zoom-btn" onclick="zoomOut()" title="Zoom Out">−</button>
+                        <span id="zoom-level">100%</span>
+                        <button class="zoom-btn" onclick="zoomIn()" title="Zoom In">+</button>
+                        <button class="zoom-btn" onclick="fitViewport()" title="Fit to Screen">⌂</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <h3>📋 Process Library</h3>
+                <ul class="process-list" id="processList">
+                    <li class="process-item active" onclick="selectProcess(this, 'sample-process')">
+                        <div class="process-name">Sample Process</div>
+                        <div class="process-date">Today</div>
+                    </li>
+                </ul>
+
+                <div class="properties-panel">
+                    <h3>🔧 Properties</h3>
+                    <div class="property-group">
+                        <div class="property-label">Process Name</div>
+                        <input type="text" class="property-input" id="processName" placeholder="Enter process name" value="Sample Process">
+                    </div>
+                    <div class="property-group">
+                        <div class="property-label">Description</div>
+                        <textarea class="property-input" id="processDescription" rows="3" placeholder="Process description"></textarea>
+                    </div>
+                    <div class="property-group">
+                        <div class="property-label">Category</div>
+                        <select class="property-input" id="processCategory">
+                            <option value="business">Business Process</option>
+                            <option value="technical">Technical Process</option>
+                            <option value="workflow">Workflow</option>
+                            <option value="automation">Automation</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include bpmn-js with multiple CDN fallbacks -->
+    <script>
+        // Function to load script with fallbacks
+        function loadBpmnScript() {
+            const cdnUrls = [
+                'https://unpkg.com/bpmn-js@latest/dist/bpmn-modeler.development.js',
+                'https://cdn.jsdelivr.net/npm/bpmn-js@latest/dist/bpmn-modeler.development.js',
+                'https://cdnjs.cloudflare.com/ajax/libs/bpmn-js/17.7.1/bpmn-modeler.development.js'
+            ];
+            
+            let currentIndex = 0;
+            
+            function tryLoadScript() {
+                if (currentIndex >= cdnUrls.length) {
+                    // All CDNs failed
+                    document.getElementById('bpmn-container').innerHTML = `
+                        <div class="loading">
+                            <div style="color: #dc3545; text-align: center; padding: 2rem;">
+                                <h3>❌ Unable to Load BPMN Library</h3>
+                                <p>All CDN sources failed to load the BPMN visualization library.</p>
+                                <p>This might be due to network issues or firewall restrictions.</p>
+                                <div style="margin-top: 1rem;">
+                                    <button class="btn btn-primary" onclick="location.reload()">🔄 Retry</button>
+                                    <button class="btn btn-secondary" onclick="window.history.back()">← Go Back</button>
+                                </div>
+                                <div style="margin-top: 2rem; font-size: 0.9rem; color: #666;">
+                                    <p><strong>Troubleshooting:</strong></p>
+                                    <p>• Check your internet connection</p>
+                                    <p>• Disable any ad blockers temporarily</p>
+                                    <p>• Try accessing from a different network</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                const script = document.createElement('script');
+                script.src = cdnUrls[currentIndex];
+                
+                script.onload = function() {
+                    console.log('BPMN-js loaded successfully from:', cdnUrls[currentIndex]);
+                    // Initialize after script loads
+                    if (document.readyState === 'loading') {
+                        document.addEventListener('DOMContentLoaded', initializeApp);
+                    } else {
+                        initializeApp();
+                    }
+                };
+                
+                script.onerror = function() {
+                    console.warn('Failed to load from:', cdnUrls[currentIndex]);
+                    currentIndex++;
+                    tryLoadScript();
+                };
+                
+                document.head.appendChild(script);
+            }
+            
+            tryLoadScript();
+        }
+        
+        function initializeApp() {
+            // Check if BpmnJS is loaded
+            if (typeof BpmnJS === 'undefined') {
+                console.error('BpmnJS library not loaded');
+                return;
+            }
+            
+            setTimeout(() => {
+                initializeBpmnModeler();
+            }, 100);
+        }
+        
+        // Start loading the script
+        loadBpmnScript();
+    </script>
+    
+    <script>
+        let bpmnModeler;
+        let currentProcess = null;
+        let processes = [];
+        let currentZoom = 1;
+
+        // Sample BPMN XML for demonstration
+        const sampleBpmn = `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn2:definitions xmlns:bpmn2="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="sample-diagram" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn2:process id="Process_1" isExecutable="false">
+    <bpmn2:startEvent id="StartEvent_1" name="Start Process">
+      <bpmn2:outgoing>Flow_1</bpmn2:outgoing>
+    </bpmn2:startEvent>
+    <bpmn2:task id="Task_1" name="Analyze Requirements">
+      <bpmn2:incoming>Flow_1</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_2</bpmn2:outgoing>
+    </bpmn2:task>
+    <bpmn2:exclusiveGateway id="Gateway_1" name="Requirements Clear?">
+      <bpmn2:incoming>Flow_2</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_3</bpmn2:outgoing>
+      <bpmn2:outgoing>Flow_4</bpmn2:outgoing>
+    </bpmn2:exclusiveGateway>
+    <bpmn2:task id="Task_2" name="Implement Solution">
+      <bpmn2:incoming>Flow_3</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_5</bpmn2:outgoing>
+    </bpmn2:task>
+    <bpmn2:task id="Task_3" name="Gather More Information">
+      <bpmn2:incoming>Flow_4</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_6</bpmn2:outgoing>
+    </bpmn2:task>
+    <bpmn2:endEvent id="EndEvent_1" name="Process Complete">
+      <bpmn2:incoming>Flow_5</bpmn2:incoming>
+    </bpmn2:endEvent>
+    <bpmn2:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Task_1" />
+    <bpmn2:sequenceFlow id="Flow_2" sourceRef="Task_1" targetRef="Gateway_1" />
+    <bpmn2:sequenceFlow id="Flow_3" name="Yes" sourceRef="Gateway_1" targetRef="Task_2" />
+    <bpmn2:sequenceFlow id="Flow_4" name="No" sourceRef="Gateway_1" targetRef="Task_3" />
+    <bpmn2:sequenceFlow id="Flow_5" sourceRef="Task_2" targetRef="EndEvent_1" />
+    <bpmn2:sequenceFlow id="Flow_6" sourceRef="Task_3" targetRef="Task_1" />
+  </bpmn2:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Process_1">
+      <bpmndi:BPMNShape id="_BPMNShape_StartEvent_2" bpmnElement="StartEvent_1">
+        <dc:Bounds x="179" y="99" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_1_di" bpmnElement="Task_1">
+        <dc:Bounds x="270" y="77" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_1_di" bpmnElement="Gateway_1" isMarkerVisible="true">
+        <dc:Bounds x="425" y="92" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_2_di" bpmnElement="Task_2">
+        <dc:Bounds x="530" y="77" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_3_di" bpmnElement="Task_3">
+        <dc:Bounds x="400" y="200" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_1_di" bpmnElement="EndEvent_1">
+        <dc:Bounds x="692" y="99" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
+        <di:waypoint x="215" y="117" />
+        <di:waypoint x="270" y="117" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
+        <di:waypoint x="370" y="117" />
+        <di:waypoint x="425" y="117" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3">
+        <di:waypoint x="475" y="117" />
+        <di:waypoint x="530" y="117" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
+        <di:waypoint x="450" y="142" />
+        <di:waypoint x="450" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5">
+        <di:waypoint x="630" y="117" />
+        <di:waypoint x="692" y="117" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_6_di" bpmnElement="Flow_6">
+        <di:waypoint x="400" y="240" />
+        <di:waypoint x="320" y="240" />
+        <di:waypoint x="320" y="157" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn2:definitions>`;
+
+        // Initialize the BPMN modeler - now called from script loader
+        // document.addEventListener('DOMContentLoaded', function() {
+        //     // This is now handled by initializeApp() function
+        // });
+
+        function initializeBpmnModeler() {
+            try {
+                // Show initialization progress
+                document.getElementById('bpmn-container').innerHTML = `
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        Initializing BPMN Modeler...
+                    </div>
+                `;
+                
+                bpmnModeler = new BpmnJS({
+                    container: '#bpmn-container',
+                    keyboard: {
+                        bindTo: window
+                    }
+                });
+
+                // Load sample process initially
+                loadSampleProcess();
+
+                // Set up event listeners
+                bpmnModeler.on('commandStack.changed', updateElementCount);
+                bpmnModeler.on('canvas.viewbox.changed', updateZoomLevel);
+                
+                // Handle import success/error
+                bpmnModeler.on('import.done', function(event) {
+                    const { error } = event;
+                    if (error) {
+                        console.error('Import error:', error);
+                        updateStatus('Error loading process', 'error');
+                    } else {
+                        updateStatus('Process loaded successfully');
+                        updateElementCount();
+                        updateZoomLevel();
+                    }
+                });
+
+                updateStatus('BPMN Modeler initialized successfully');
+                
+            } catch (error) {
+                console.error('Error initializing BPMN modeler:', error);
+                updateStatus('Error initializing modeler', 'error');
+                
+                // Show fallback UI
+                document.getElementById('bpmn-container').innerHTML = `
+                    <div class="loading">
+                        <div style="color: #dc3545; text-align: center;">
+                            <h3>⚠️ Initialization Error</h3>
+                            <p>Failed to initialize the BPMN modeler.</p>
+                            <p>Error: ${error.message}</p>
+                            <button class="btn btn-primary" onclick="initializeBpmnModeler()">🔄 Retry</button>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function createNewProcess() {
+            const newBpmn = `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn2:definitions xmlns:bpmn2="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="new-diagram" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn2:process id="Process_1" isExecutable="false">
+    <bpmn2:startEvent id="StartEvent_1" />
+  </bpmn2:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Process_1">
+      <bpmndi:BPMNShape id="_BPMNShape_StartEvent_2" bpmnElement="StartEvent_1">
+        <dc:Bounds x="179" y="99" width="36" height="36" />
+      </bpmndi:BPMNShape>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn2:definitions>`;
+
+            bpmnModeler.importXML(newBpmn).then(() => {
+                document.getElementById('processName').value = 'New Process';
+                document.getElementById('processDescription').value = '';
+                updateStatus('New process created');
+                fitViewport();
+            }).catch(err => {
+                console.error('Error creating new process:', err);
+                updateStatus('Error creating new process', 'error');
+            });
+        }
+
+        function loadSampleProcess() {
+            if (!bpmnModeler) {
+                console.error('BPMN Modeler not initialized');
+                return;
+            }
+
+            bpmnModeler.importXML(sampleBpmn).then(() => {
+                updateStatus('Sample process loaded successfully');
+                setTimeout(() => {
+                    fitViewport();
+                }, 100);
+            }).catch(err => {
+                console.error('Error loading sample process:', err);
+                updateStatus('Error loading sample process: ' + err.message, 'error');
+                
+                // Try to load a minimal process as fallback
+                const minimalBpmn = `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn2:definitions xmlns:bpmn2="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="minimal-diagram" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn2:process id="Process_1" isExecutable="false">
+    <bpmn2:startEvent id="StartEvent_1" name="Start">
+      <bpmn2:outgoing>Flow_1</bpmn2:outgoing>
+    </bpmn2:startEvent>
+    <bpmn2:endEvent id="EndEvent_1" name="End">
+      <bpmn2:incoming>Flow_1</bpmn2:incoming>
+    </bpmn2:endEvent>
+    <bpmn2:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="EndEvent_1" />
+  </bpmn2:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Process_1">
+      <bpmndi:BPMNShape id="_BPMNShape_StartEvent_2" bpmnElement="StartEvent_1">
+        <dc:Bounds x="179" y="99" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="_BPMNShape_EndEvent_2" bpmnElement="EndEvent_1">
+        <dc:Bounds x="279" y="99" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
+        <di:waypoint x="215" y="117" />
+        <di:waypoint x="279" y="117" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn2:definitions>`;
+
+                bpmnModeler.importXML(minimalBpmn).then(() => {
+                    updateStatus('Minimal process loaded as fallback');
+                    fitViewport();
+                }).catch(fallbackErr => {
+                    console.error('Even fallback failed:', fallbackErr);
+                    updateStatus('Critical error: Unable to load any process', 'error');
+                });
+            });
+        }
+
+        function saveProcess() {
+            bpmnModeler.saveXML({ format: true }).then(result => {
+                const processName = document.getElementById('processName').value || 'Untitled Process';
+                const processData = {
+                    name: processName,
+                    description: document.getElementById('processDescription').value,
+                    category: document.getElementById('processCategory').value,
+                    xml: result.xml,
+                    created: new Date().toISOString()
+                };
+
+                // In a real application, you would save this to your database
+                // For demo purposes, we'll store in localStorage
+                const savedProcesses = JSON.parse(localStorage.getItem('mactaProcesses') || '[]');
+                savedProcesses.push(processData);
+                localStorage.setItem('mactaProcesses', JSON.stringify(savedProcesses));
+
+                updateStatus('Process saved successfully', 'success');
+                loadProcessList();
+            }).catch(err => {
+                console.error('Error saving process:', err);
+                updateStatus('Error saving process', 'error');
+            });
+        }
+
+        function exportProcess() {
+            bpmnModeler.saveXML({ format: true }).then(result => {
+                const blob = new Blob([result.xml], { type: 'application/xml' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = (document.getElementById('processName').value || 'process') + '.bpmn';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                updateStatus('Process exported successfully', 'success');
+            }).catch(err => {
+                console.error('Error exporting process:', err);
+                updateStatus('Error exporting process', 'error');
+            });
+        }
+
+        function importProcess() {
+            document.getElementById('fileInput').click();
+        }
+
+        function handleFileImport(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const xml = e.target.result;
+                    bpmnModeler.importXML(xml).then(() => {
+                        updateStatus('Process imported successfully', 'success');
+                        document.getElementById('processName').value = file.name.replace(/\.[^/.]+$/, "");
+                        fitViewport();
+                    }).catch(err => {
+                        console.error('Error importing process:', err);
+                        updateStatus('Error importing process', 'error');
+                    });
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        function simulateProcess() {
+            // Get current process data
+            bpmnModeler.saveXML({ format: true }).then(result => {
+                const processName = document.getElementById('processName').value || 'Current Process';
+                const processData = {
+                    name: processName,
+                    xml: result.xml,
+                    timestamp: Date.now()
+                };
+                
+                // Store process data for simulation
+                localStorage.setItem('mactaSimulationProcess', JSON.stringify(processData));
+                
+                updateStatus('Launching simulation...', 'info');
+                
+                // Redirect to simulation results page
+                setTimeout(() => {
+                    window.open('simulation-results.html', '_blank');
+                }, 1000);
+                
+            }).catch(err => {
+                console.error('Error preparing simulation:', err);
+                updateStatus('Error preparing simulation', 'error');
+            });
+        }
+
+        function selectProcess(element, processId) {
+            // Remove active class from all items
+            document.querySelectorAll('.process-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Add active class to selected item
+            element.classList.add('active');
+            
+            // Load the process (this would load from database in real app)
+            updateStatus('Loading process: ' + processId);
+        }
+
+        function loadProcessList() {
+            const savedProcesses = JSON.parse(localStorage.getItem('mactaProcesses') || '[]');
+            const processList = document.getElementById('processList');
+            
+            // Keep the sample process, add saved ones
+            const sampleItem = processList.querySelector('.process-item');
+            processList.innerHTML = '';
+            processList.appendChild(sampleItem);
+            
+            savedProcesses.forEach((process, index) => {
+                const listItem = document.createElement('li');
+                listItem.className = 'process-item';
+                listItem.onclick = () => selectProcess(listItem, 'saved-' + index);
+                listItem.innerHTML = `
+                    <div class="process-name">${process.name}</div>
+                    <div class="process-date">${new Date(process.created).toLocaleDateString()}</div>
+                `;
+                processList.appendChild(listItem);
+            });
+        }
+
+        function updateElementCount() {
+            try {
+                const elementRegistry = bpmnModeler.get('elementRegistry');
+                const elements = elementRegistry.getAll();
+                document.getElementById('element-count').textContent = elements.length;
+            } catch (error) {
+                console.error('Error updating element count:', error);
+            }
+        }
+
+        function updateZoomLevel() {
+            try {
+                const canvas = bpmnModeler.get('canvas');
+                const viewbox = canvas.viewbox();
+                const zoomLevel = Math.round(viewbox.scale * 100);
+                document.getElementById('zoom-level').textContent = zoomLevel + '%';
+                currentZoom = viewbox.scale;
+            } catch (error) {
+                console.error('Error updating zoom level:', error);
+            }
+        }
+
+        function zoomIn() {
+            try {
+                const canvas = bpmnModeler.get('canvas');
+                canvas.zoom(currentZoom + 0.1);
+            } catch (error) {
+                console.error('Error zooming in:', error);
+            }
+        }
+
+        function zoomOut() {
+            try {
+                const canvas = bpmnModeler.get('canvas');
+                canvas.zoom(Math.max(currentZoom - 0.1, 0.1));
+            } catch (error) {
+                console.error('Error zooming out:', error);
+            }
+        }
+
+        function fitViewport() {
+            try {
+                const canvas = bpmnModeler.get('canvas');
+                canvas.zoom('fit-viewport');
+            } catch (error) {
+                console.error('Error fitting viewport:', error);
+            }
+        }
+
+        function updateStatus(message, type = 'info') {
+            const statusText = document.getElementById('status-text');
+            statusText.textContent = message;
+            
+            // Show alert for important messages
+            if (type === 'success' || type === 'error') {
+                showAlert(message, type);
+            }
+            
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function showAlert(message, type) {
+            const alertsContainer = document.getElementById('alerts');
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type === 'error' ? 'error' : 'success'}`;
+            alertDiv.textContent = message;
+            
+            alertsContainer.appendChild(alertDiv);
+            
+            // Auto-remove alert after 5 seconds
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.parentNode.removeChild(alertDiv);
+                }
+            }, 5000);
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case 's':
+                        e.preventDefault();
+                        saveProcess();
+                        break;
+                    case 'n':
+                        e.preventDefault();
+                        createNewProcess();
+                        break;
+                    case 'o':
+                        e.preventDefault();
+                        importProcess();
+                        break;
+                    case 'e':
+                        e.preventDefault();
+                        exportProcess();
+                        break;
+                }
+            }
+        });
+
+        // Auto-save functionality (saves to localStorage every 30 seconds)
+        setInterval(() => {
+            if (bpmnModeler) {
+                bpmnModeler.saveXML({ format: true }).then(result => {
+                    localStorage.setItem('mactaAutoSave', JSON.stringify({
+                        xml: result.xml,
+                        timestamp: Date.now(),
+                        processName: document.getElementById('processName').value
+                    }));
+                }).catch(err => {
+                    console.warn('Auto-save failed:', err);
+                });
+            }
+        }, 30000);
+
+        // Load auto-saved content on page load
+        window.addEventListener('load', () => {
+            const autoSaved = localStorage.getItem('mactaAutoSave');
+            if (autoSaved) {
+                try {
+                    const data = JSON.parse(autoSaved);
+                    // Only load if it's recent (within last hour)
+                    if (Date.now() - data.timestamp < 3600000) {
+                        const loadAutoSave = confirm('Found auto-saved work from ' + 
+                            new Date(data.timestamp).toLocaleString() + 
+                            '. Would you like to restore it?');
+                        
+                        if (loadAutoSave && bpmnModeler) {
+                            bpmnModeler.importXML(data.xml).then(() => {
+                                document.getElementById('processName').value = data.processName || 'Auto-saved Process';
+                                updateStatus('Auto-saved work restored', 'success');
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.warn('Failed to load auto-saved data:', error);
+                }
+            }
+            
+            // Load saved processes list
+            loadProcessList();
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (bpmnModeler) {
+                setTimeout(() => {
+                    try {
+                        const canvas = bpmnModeler.get('canvas');
+                        canvas.resized();
+                    } catch (error) {
+                        console.warn('Error handling resize:', error);
+                    }
+                }, 100);
+            }
+        });
+
+        // Process validation function
+        function validateProcess() {
+            try {
+                const elementRegistry = bpmnModeler.get('elementRegistry');
+                const elements = elementRegistry.getAll();
+                
+                let startEvents = 0;
+                let endEvents = 0;
+                let orphanedElements = [];
+                
+                elements.forEach(element => {
+                    if (element.type === 'bpmn:StartEvent') {
+                        startEvents++;
+                    } else if (element.type === 'bpmn:EndEvent') {
+                        endEvents++;
+                    }
+                    
+                    // Check for orphaned elements (no incoming or outgoing flows)
+                    if (element.businessObject && element.businessObject.$type && 
+                        element.businessObject.$type.includes('Task') &&
+                        (!element.incoming || element.incoming.length === 0) &&
+                        (!element.outgoing || element.outgoing.length === 0)) {
+                        orphanedElements.push(element);
+                    }
+                });
+                
+                let validationMessage = 'Process validation: ';
+                let isValid = true;
+                
+                if (startEvents === 0) {
+                    validationMessage += 'Missing start event. ';
+                    isValid = false;
+                }
+                
+                if (endEvents === 0) {
+                    validationMessage += 'Missing end event. ';
+                    isValid = false;
+                }
+                
+                if (orphanedElements.length > 0) {
+                    validationMessage += `${orphanedElements.length} orphaned elements found. `;
+                    isValid = false;
+                }
+                
+                if (isValid) {
+                    validationMessage += 'Process is valid ✓';
+                    updateStatus(validationMessage, 'success');
+                } else {
+                    updateStatus(validationMessage, 'error');
+                }
+                
+                return isValid;
+            } catch (error) {
+                console.error('Error validating process:', error);
+                updateStatus('Error during process validation', 'error');
+                return false;
+            }
+        }
+
+        // Add validation to toolbar
+        function addValidationButton() {
+            const toolbar = document.querySelector('.toolbar');
+            const validationBtn = document.createElement('button');
+            validationBtn.className = 'btn btn-secondary';
+            validationBtn.innerHTML = '✓ Validate';
+            validationBtn.onclick = validateProcess;
+            toolbar.appendChild(validationBtn);
+        }
+
+        // Initialize validation button when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            addValidationButton();
+        });
+    </script>
+</body>
+</html>
