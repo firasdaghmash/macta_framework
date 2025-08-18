@@ -105,7 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MACTA Process Manager - Design, View, Assign & Simulate</title>
 
-    <!-- MACTA Brand Colors and Layout -->
+    <!-- MACTA Brand Colors and Enhanced Tab Layout -->
     <style>
         :root {
             --macta-orange: #ff7b54;
@@ -116,6 +116,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             --macta-dark: #2d3436;
             --macta-light: #ddd;
             --box-height: 600px;
+            
+            /* Animation Color Palette - 8 distinct colors */
+            --anim-color-1: #FF6B6B; /* Red */
+            --anim-color-2: #4ECDC4; /* Teal */
+            --anim-color-3: #45B7D1; /* Blue */
+            --anim-color-4: #96CEB4; /* Green */
+            --anim-color-5: #FFEAA7; /* Yellow */
+            --anim-color-6: #DDA0DD; /* Purple */
+            --anim-color-7: #98D8C8; /* Mint */
+            --anim-color-8: #F7DC6F; /* Gold */
         }
 
         * {
@@ -163,139 +173,123 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             font-size: 18px;
         }
 
-        .nav-tabs {
+        /* Enhanced Tab Navigation */
+        .tab-navigation {
             display: flex;
-            gap: 10px;
-        }
-
-        .nav-tab {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 25px;
-            background: var(--macta-light);
-            color: var(--macta-dark);
-            cursor: pointer;
-            font-weight: 500;
-            transition: all 0.3s ease;
-        }
-
-        .nav-tab.active {
-            background: var(--macta-orange);
-            color: white;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(255,123,84,0.3);
-        }
-
-        .nav-tab:hover:not(.active) {
-            background: #ccc;
-            transform: translateY(-1px);
-        }
-
-        .main-container {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            width: 100%;
-            max-width: none;
-        }
-
-        .panel {
             background: white;
             border-radius: 15px;
-            padding: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            width: 100%;
-            transition: all 0.3s ease;
-        }
-
-        .panel.collapsed {
-            max-height: 80px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
             overflow: hidden;
-            padding: 15px 20px;
+            margin-bottom: 20px;
         }
 
-        .panel.expanded {
-            max-height: none;
-            min-height: 600px;
-        }
-
-        .panel-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-            padding: 10px 0;
-        }
-
-        .panel-header h2 {
-            color: var(--macta-dark);
-            font-size: 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin: 0;
-        }
-
-        .panel-toggle {
-            background: none;
+        .tab-button {
+            flex: 1;
+            padding: 20px;
             border: none;
-            font-size: 18px;
+            background: white;
             cursor: pointer;
-            transition: transform 0.3s ease;
+            font-size: 16px;
+            font-weight: 500;
             color: var(--macta-dark);
-        }
-
-        .panel-toggle.expanded {
-            transform: rotate(180deg);
-        }
-
-        .panel-content {
-            display: none;
-            flex-direction: column;
-            height: 600px;
-        }
-
-        .panel-content.active {
-            display: flex;
-        }
-
-        .panel-icon {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
+            transition: all 0.3s ease;
+            position: relative;
             display: flex;
             align-items: center;
             justify-content: center;
+            gap: 10px;
+            border-right: 1px solid var(--macta-light);
+        }
+
+        .tab-button:last-child {
+            border-right: none;
+        }
+
+        .tab-button.active {
+            background: var(--macta-orange);
             color: white;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(255,123,84,0.3);
+        }
+
+        .tab-button:hover:not(.active) {
+            background: #f8f9fa;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .tab-icon {
+            font-size: 20px;
+        }
+
+        /* Main Content Area */
+        .main-content {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 25px;
+            min-height: 70vh;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .tab-header {
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--macta-light);
+        }
+
+        .tab-header h2 {
+            color: var(--macta-dark);
+            font-size: 24px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .tab-header p {
+            color: #666;
             font-size: 14px;
         }
 
-        #bpmn-editor, #bpmn-viewer {
+        /* BPMN Containers */
+        #bpmn-editor, #bpmn-viewer, #simulation-viewer {
             height: var(--box-height);
             border: 2px solid var(--macta-light);
             border-radius: 10px;
-            flex: 1;
+            background: #fafafa;
+            margin-bottom: 20px;
         }
 
         .toolbar {
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid var(--macta-light);
+            margin-bottom: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
         }
 
         .btn {
             padding: 10px 20px;
             border: none;
-            border-radius: 25px;
+            border-radius: 8px;
             cursor: pointer;
             font-weight: 500;
             transition: all 0.3s ease;
             display: flex;
             align-items: center;
             gap: 8px;
+            font-size: 14px;
         }
 
         .btn-primary {
@@ -342,56 +336,168 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             box-shadow: 0 5px 15px rgba(253,203,110,0.3);
         }
 
+        .btn-danger {
+            background: var(--macta-red);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #b71c1c;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(214,48,49,0.3);
+        }
+
         .status-bar {
             background: #f8f9fa;
-            padding: 10px 15px;
+            padding: 15px;
             border-radius: 8px;
-            margin-top: 10px;
-            font-size: 12px;
+            margin-top: 15px;
+            font-size: 14px;
             color: #666;
             border-left: 4px solid var(--macta-orange);
         }
 
         .process-selector {
-            margin-bottom: 15px;
+            margin-bottom: 20px;
         }
 
         .process-selector select {
             width: 100%;
-            padding: 10px;
+            padding: 12px;
             border: 2px solid var(--macta-light);
             border-radius: 8px;
             font-size: 14px;
             background: white;
         }
 
-        .tab-content {
-            display: none;
+        /* Animation Color System - Each run gets a different color */
+        .animation-run-1 .djs-visual > rect,
+        .animation-run-1 .djs-visual > circle,
+        .animation-run-1 .djs-visual > polygon {
+            fill: var(--anim-color-1) !important;
+            stroke: #e55555 !important;
+            stroke-width: 4px !important;
+            animation: pulse-1 1.5s infinite;
         }
 
-        .tab-content.active {
-            display: block;
+        .animation-run-2 .djs-visual > rect,
+        .animation-run-2 .djs-visual > circle,
+        .animation-run-2 .djs-visual > polygon {
+            fill: var(--anim-color-2) !important;
+            stroke: #3cb8b1 !important;
+            stroke-width: 4px !important;
+            animation: pulse-2 1.5s infinite;
         }
 
+        .animation-run-3 .djs-visual > rect,
+        .animation-run-3 .djs-visual > circle,
+        .animation-run-3 .djs-visual > polygon {
+            fill: var(--anim-color-3) !important;
+            stroke: #3a9bc1 !important;
+            stroke-width: 4px !important;
+            animation: pulse-3 1.5s infinite;
+        }
+
+        .animation-run-4 .djs-visual > rect,
+        .animation-run-4 .djs-visual > circle,
+        .animation-run-4 .djs-visual > polygon {
+            fill: var(--anim-color-4) !important;
+            stroke: #7bb89f !important;
+            stroke-width: 4px !important;
+            animation: pulse-4 1.5s infinite;
+        }
+
+        .animation-run-5 .djs-visual > rect,
+        .animation-run-5 .djs-visual > circle,
+        .animation-run-5 .djs-visual > polygon {
+            fill: var(--anim-color-5) !important;
+            stroke: #e6d085 !important;
+            stroke-width: 4px !important;
+            animation: pulse-5 1.5s infinite;
+        }
+
+        .animation-run-6 .djs-visual > rect,
+        .animation-run-6 .djs-visual > circle,
+        .animation-run-6 .djs-visual > polygon {
+            fill: var(--anim-color-6) !important;
+            stroke: #c088c0 !important;
+            stroke-width: 4px !important;
+            animation: pulse-6 1.5s infinite;
+        }
+
+        .animation-run-7 .djs-visual > rect,
+        .animation-run-7 .djs-visual > circle,
+        .animation-run-7 .djs-visual > polygon {
+            fill: var(--anim-color-7) !important;
+            stroke: #7dbfb3 !important;
+            stroke-width: 4px !important;
+            animation: pulse-7 1.5s infinite;
+        }
+
+        .animation-run-8 .djs-visual > rect,
+        .animation-run-8 .djs-visual > circle,
+        .animation-run-8 .djs-visual > polygon {
+            fill: var(--anim-color-8) !important;
+            stroke: #ddb84f !important;
+            stroke-width: 4px !important;
+            animation: pulse-8 1.5s infinite;
+        }
+
+        /* Flow animations for sequence flows */
+        .animation-run-1 .djs-visual > path { stroke: var(--anim-color-1) !important; stroke-width: 4px !important; animation: flow-1 2s infinite; }
+        .animation-run-2 .djs-visual > path { stroke: var(--anim-color-2) !important; stroke-width: 4px !important; animation: flow-2 2s infinite; }
+        .animation-run-3 .djs-visual > path { stroke: var(--anim-color-3) !important; stroke-width: 4px !important; animation: flow-3 2s infinite; }
+        .animation-run-4 .djs-visual > path { stroke: var(--anim-color-4) !important; stroke-width: 4px !important; animation: flow-4 2s infinite; }
+        .animation-run-5 .djs-visual > path { stroke: var(--anim-color-5) !important; stroke-width: 4px !important; animation: flow-5 2s infinite; }
+        .animation-run-6 .djs-visual > path { stroke: var(--anim-color-6) !important; stroke-width: 4px !important; animation: flow-6 2s infinite; }
+        .animation-run-7 .djs-visual > path { stroke: var(--anim-color-7) !important; stroke-width: 4px !important; animation: flow-7 2s infinite; }
+        .animation-run-8 .djs-visual > path { stroke: var(--anim-color-8) !important; stroke-width: 4px !important; animation: flow-8 2s infinite; }
+
+        /* Pulse keyframes for each color */
+        @keyframes pulse-1 { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        @keyframes pulse-2 { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        @keyframes pulse-3 { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        @keyframes pulse-4 { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        @keyframes pulse-5 { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        @keyframes pulse-6 { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        @keyframes pulse-7 { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        @keyframes pulse-8 { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+
+        /* Flow keyframes with different patterns */
+        @keyframes flow-1 { 0% { stroke-dasharray: 10 5; stroke-dashoffset: 0; } 100% { stroke-dasharray: 10 5; stroke-dashoffset: -15; } }
+        @keyframes flow-2 { 0% { stroke-dasharray: 8 6; stroke-dashoffset: 0; } 100% { stroke-dasharray: 8 6; stroke-dashoffset: -14; } }
+        @keyframes flow-3 { 0% { stroke-dasharray: 12 4; stroke-dashoffset: 0; } 100% { stroke-dasharray: 12 4; stroke-dashoffset: -16; } }
+        @keyframes flow-4 { 0% { stroke-dasharray: 9 7; stroke-dashoffset: 0; } 100% { stroke-dasharray: 9 7; stroke-dashoffset: -16; } }
+        @keyframes flow-5 { 0% { stroke-dasharray: 11 5; stroke-dashoffset: 0; } 100% { stroke-dasharray: 11 5; stroke-dashoffset: -16; } }
+        @keyframes flow-6 { 0% { stroke-dasharray: 7 8; stroke-dashoffset: 0; } 100% { stroke-dasharray: 7 8; stroke-dashoffset: -15; } }
+        @keyframes flow-7 { 0% { stroke-dasharray: 10 6; stroke-dashoffset: 0; } 100% { stroke-dasharray: 10 6; stroke-dashoffset: -16; } }
+        @keyframes flow-8 { 0% { stroke-dasharray: 13 3; stroke-dashoffset: 0; } 100% { stroke-dasharray: 13 3; stroke-dashoffset: -16; } }
+
+        /* Performance Metrics */
         .performance-metrics {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 15px;
-            margin-top: 15px;
+            margin: 20px 0;
         }
 
         .metric-card {
             background: linear-gradient(135deg, var(--macta-teal), var(--macta-green));
             color: white;
-            padding: 15px;
+            padding: 20px;
             border-radius: 10px;
             text-align: center;
+            transition: transform 0.3s ease;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-3px);
         }
 
         .metric-value {
-            font-size: 24px;
+            font-size: 28px;
             font-weight: bold;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
         }
 
         .metric-label {
@@ -399,42 +505,79 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             opacity: 0.9;
         }
 
-        .assignment-panel {
-            display: none;
-            margin-top: 15px;
+        /* Animation Status */
+        .animation-status {
+            background: white;
             padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
+            border-radius: 10px;
+            border-left: 4px solid var(--macta-orange);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
         }
 
-        .assignment-panel.active {
-            display: block;
+        .animation-status.running {
+            border-left-color: var(--macta-green);
+            background: #e8f5e8;
+        }
+
+        .animation-status.stopped {
+            border-left-color: var(--macta-red);
+            background: #ffebee;
+        }
+
+        /* Color Legend */
+        .color-legend {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 1px solid var(--macta-light);
+        }
+
+        .legend-items {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px;
+            border-radius: 6px;
+            background: #f8f9fa;
+        }
+
+        .legend-color {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            border: 2px solid #ccc;
+        }
+
+        .assignment-panel {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
         }
 
         .assignment-form {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-top: 10px;
+            gap: 15px;
+            margin-top: 15px;
         }
 
         .assignment-form input, .assignment-form select {
-            padding: 8px;
-            border: 1px solid var(--macta-light);
-            border-radius: 5px;
-        }
-
-        .simulation-controls {
-            display: none;
-            gap: 10px;
-            margin-top: 10px;
-            padding: 15px;
-            background: #f8f9fa;
+            padding: 12px;
+            border: 2px solid var(--macta-light);
             border-radius: 8px;
-        }
-
-        .simulation-controls.active {
-            display: flex;
+            font-size: 14px;
         }
 
         .loading {
@@ -446,118 +589,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             color: var(--macta-orange);
         }
 
-        /* BPMN.js diagram fixes - prevent transform errors */
+        /* BPMN.js Enhanced Styling */
         .bjs-container {
             background: white !important;
         }
         
         .djs-element {
             pointer-events: all !important;
-        }
-        
-        .djs-shape, .djs-connection {
-            fill: none !important;
-            stroke: #333 !important;
-        }
-        
-        .djs-shape .djs-visual > rect {
-            fill: white !important;
-            stroke: #333 !important;
-            stroke-width: 2px !important;
-        }
-        
-        .djs-shape .djs-visual > circle {
-            fill: white !important;
-            stroke: #333 !important;
-            stroke-width: 2px !important;
-        }
-        
-        .djs-shape .djs-visual > polygon {
-            fill: white !important;
-            stroke: #333 !important;
-            stroke-width: 2px !important;
-        }
-        
-        /* Fix BPMN.js display issues */
-        .bjs-container {
-            background: white !important;
-            position: relative !important;
-        }
-        
-        .djs-container {
-            position: relative !important;
-            overflow: hidden !important;
-        }
-        
-        .djs-element {
-            pointer-events: all !important;
-        }
-        
-        .djs-shape .djs-visual > rect {
-            fill: white !important;
-            stroke: #333 !important;
-            stroke-width: 2px !important;
-        }
-        
-        .djs-shape .djs-visual > circle {
-            fill: white !important;
-            stroke: #333 !important;
-            stroke-width: 2px !important;
-        }
-        
-        .djs-shape .djs-visual > polygon {
-            fill: white !important;
-            stroke: #333 !important;
-            stroke-width: 2px !important;
-        }
-        
-        /* Fix missing element shapes */
-        .djs-shape[data-element-id*="Task"] .djs-visual {
-            visibility: visible !important;
-            display: block !important;
-        }
-        
-        .djs-shape[data-element-id*="Event"] .djs-visual {
-            visibility: visible !important;
-            display: block !important;
-        }
-        
-        .djs-shape[data-element-id*="Gateway"] .djs-visual {
-            visibility: visible !important;
-            display: block !important;
-        }
-        
-        /* Fix transform matrix issues completely */
-        .djs-element[transform*="NaN"] {
-            transform: translate(0px, 0px) !important;
-        }
-        
-        .djs-group[transform*="NaN"] {
-            transform: translate(0px, 0px) !important;
-        }
-        
-        /* Prevent CSS transform errors */
-        .djs-visual {
-            transform: none !important;
-        }
-        
-        .djs-hit {
-            visibility: hidden !important;
-        }
-        
-        /* Force display of BPMN elements */
-        .bjs-container .djs-visual rect,
-        .bjs-container .djs-visual circle,
-        .bjs-container .djs-visual polygon,
-        .bjs-container .djs-visual path {
-            display: block !important;
-            visibility: visible !important;
         }
         
         /* Task styling */
         .djs-shape[data-element-id*="Task"] .djs-visual > rect {
             fill: #f8f9fa !important;
             stroke: var(--macta-teal) !important;
+            stroke-width: 2px !important;
         }
         
         /* Start event styling */
@@ -578,6 +623,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         .djs-shape[data-element-id*="Gateway"] .djs-visual > polygon {
             fill: #fff8e1 !important;
             stroke: var(--macta-yellow) !important;
+            stroke-width: 2px !important;
         }
         
         /* Connection styling */
@@ -593,126 +639,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             font-size: 12px !important;
             fill: #333 !important;
         }
-        
-        /* Highlighted elements during simulation */
-        .simulation-highlight .djs-visual > rect,
-        .simulation-highlight .djs-visual > circle,
-        .simulation-highlight .djs-visual > polygon {
-            fill: var(--macta-orange) !important;
-            stroke: var(--macta-red) !important;
-            stroke-width: 4px !important;
-            animation: pulse 1s infinite;
-        }
-        
-        .simulation-highlight .djs-visual > path {
-            stroke: var(--macta-orange) !important;
-            stroke-width: 4px !important;
-            animation: flow 2s infinite;
-        }
-        
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.7; }
-            100% { opacity: 1; }
-        }
-        
-        @keyframes flow {
-            0% { stroke-dasharray: 10 5; stroke-dashoffset: 0; }
-            100% { stroke-dasharray: 10 5; stroke-dashoffset: -15; }
-        }
-        
-        /* Bottleneck highlighting */
-        .bottleneck-highlight .djs-visual > rect,
-        .bottleneck-highlight .djs-visual > circle,
-        .bottleneck-highlight .djs-visual > polygon {
-            fill: #ffebee !important;
-            stroke: var(--macta-red) !important;
-            stroke-width: 4px !important;
-            animation: warning 0.5s infinite alternate;
-        }
-        
-        /* Enhanced full screen mode with higher z-index */
-        .panel.fullscreen {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100vw !important;
-            height: 100vh !important;
-            z-index: 999999 !important;
-            margin: 0 !important;
-            border-radius: 0 !important;
-            background: white !important;
-            box-shadow: none !important;
-        }
-        
-        .panel.fullscreen .panel-content {
-            height: calc(100vh - 120px) !important;
-            overflow: auto !important;
-            padding: 20px !important;
-        }
-        
-        .panel.fullscreen #bpmn-editor,
-        .panel.fullscreen #bpmn-viewer,
-        .panel.fullscreen #simulation-viewer {
-            height: calc(100vh - 250px) !important;
-            width: 100% !important;
-        }
-        
-        .fullscreen-controls {
-            position: fixed !important;
-            top: 15px !important;
-            right: 15px !important;
-            z-index: 1000000 !important;
-        }
-        
-        .btn-close-fullscreen {
-            background: var(--macta-red) !important;
-            color: white !important;
-            font-size: 20px !important;
-            padding: 12px 16px !important;
-            border-radius: 50% !important;
-            border: none !important;
-            cursor: pointer !important;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
-        }
-        
-        .btn-close-fullscreen:hover {
-            background: #b71c1c !important;
-            transform: scale(1.1) !important;
-        }
-        .validation-error .djs-visual > rect,
-        .validation-error .djs-visual > circle,
-        .validation-error .djs-visual > polygon {
-            fill: #ffebee !important;
-            stroke: var(--macta-red) !important;
-            stroke-width: 4px !important;
-            animation: validation-pulse 1s infinite;
-        }
-        
-        @keyframes validation-pulse {
-            0% { stroke: var(--macta-red); }
-            50% { stroke: #ff5722; }
-            100% { stroke: var(--macta-red); }
-        }
 
-        .legend {
-            font-size: 12px;
-            margin-top: 10px;
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 5px;
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .tab-navigation {
+                flex-direction: column;
+            }
+
+            .tab-button {
+                border-right: none !important;
+                border-bottom: 1px solid var(--macta-light);
+                padding: 15px;
+            }
+
+            .tab-button:last-child {
+                border-bottom: none;
+            }
+
+            .toolbar {
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .assignment-form {
+                grid-template-columns: 1fr;
+            }
+
+            .performance-metrics {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 
-    <!-- BPMN.js styles from multiple CDN sources for reliability -->
+    <!-- BPMN.js styles -->
     <link rel="stylesheet" href="https://unpkg.com/bpmn-js@17.0.0/dist/assets/diagram-js.css" />
     <link rel="stylesheet" href="https://unpkg.com/bpmn-js@17.0.0/dist/assets/bpmn-font/css/bpmn-embedded.css" />
-    
-    <!-- Fallback CDN -->
-    <style>
-        @import url('https://cdn.jsdelivr.net/npm/bpmn-js@17.0.0/dist/assets/diagram-js.css');
-        @import url('https://cdn.jsdelivr.net/npm/bpmn-js@17.0.0/dist/assets/bpmn-font/css/bpmn-embedded.css');
-    </style>
 </head>
 <body>
     <!-- Header -->
@@ -721,32 +682,133 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             <div class="macta-logo">M</div>
             MACTA Process Manager
         </h1>
-        <div class="nav-tabs">
-            <button class="nav-tab active" onclick="togglePanel('design')">Design</button>
-            <button class="nav-tab" onclick="togglePanel('view')">View</button>
-            <button class="nav-tab" onclick="togglePanel('assign')">Assign</button>
-            <button class="nav-tab" onclick="togglePanel('simulate')">Simulate</button>
+        <div>
+            <a href="../" class="btn btn-secondary">
+                <span>←</span> Back to Framework
+            </a>
         </div>
     </div>
 
-    <!-- Main Container -->
-    <div class="main-container">
-        <!-- Design Panel -->
-        <div class="panel expanded" id="design-panel">
-            <div class="panel-header" onclick="togglePanel('design')">
+    <!-- Tab Navigation -->
+    <div class="tab-navigation">
+        <button class="tab-button active" onclick="switchTab('design')" data-tab="design">
+            <span class="tab-icon">🎨</span>
+            <span>Design</span>
+        </button>
+        <button class="tab-button" onclick="switchTab('view')" data-tab="view">
+            <span class="tab-icon">👁️</span>
+            <span>View</span>
+        </button>
+        <button class="tab-button" onclick="switchTab('assign')" data-tab="assign">
+            <span class="tab-icon">👥</span>
+            <span>Assign</span>
+        </button>
+        <button class="tab-button" onclick="switchTab('simulate')" data-tab="simulate">
+            <span class="tab-icon">⚡</span>
+            <span>Simulate</span>
+        </button>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Design Tab -->
+        <div class="tab-content active" id="design-tab">
+            <div class="tab-header">
                 <h2>
-                    <div class="panel-icon" style="background: var(--macta-orange);">🎨</div>
+                    <span class="tab-icon">🎨</span>
                     Process Design & Modeling
                 </h2>
-                <button class="panel-toggle expanded">▼</button>
+                <p>Create and edit business process models using BPMN 2.0 standard</p>
             </div>
-            
-            <div class="panel-content active">
-                <!-- Process Selector -->
-                <div class="process-selector">
-                    <select id="process-select">
-                        <option value="">Select a Process...</option>
-                        <option value="new">+ Create New Process</option>
+
+            <!-- Process Selector -->
+            <div class="process-selector">
+                <select id="process-select">
+                    <option value="">Select a Process...</option>
+                    <option value="new">+ Create New Process</option>
+                    <?php foreach ($processes as $process): ?>
+                        <option value="<?= $process['id'] ?>" data-xml="<?= htmlspecialchars($process['model_data']) ?>">
+                            <?= htmlspecialchars($process['name']) ?> 
+                            <?php if ($process['project_name']): ?>
+                                (<?= htmlspecialchars($process['project_name']) ?>)
+                            <?php endif; ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <!-- BPMN Editor -->
+            <div id="bpmn-editor">
+                <div class="loading">Loading BPMN Editor...</div>
+            </div>
+
+            <!-- Design Toolbar -->
+            <div class="toolbar">
+                <button class="btn btn-primary" id="btn-new-process">
+                    📄 New Process
+                </button>
+                <button class="btn btn-secondary" id="btn-save-process">
+                    💾 Save Process
+                </button>
+                <button class="btn btn-warning" id="btn-clear-designer">
+                    🗑️ Clear Designer
+                </button>
+                <button class="btn btn-secondary" id="btn-validate-process">
+                    ✅ Validate
+                </button>
+                <button class="btn btn-secondary" id="btn-zoom-in">
+                    🔍+ Zoom In
+                </button>
+                <button class="btn btn-secondary" id="btn-zoom-out">
+                    🔍- Zoom Out
+                </button>
+                <button class="btn btn-secondary" id="btn-zoom-fit">
+                    🔍 Fit to Screen
+                </button>
+                <button class="btn btn-success" id="btn-export-xml">
+                    📤 Export to Viewer
+                </button>
+            </div>
+
+            <div class="status-bar">
+                <span class="token"></span> Use the toolbar above to create and edit your process models.
+                <?php if (!empty($db_error)): ?>
+                    <strong>Database Error:</strong> <?= htmlspecialchars($db_error) ?>
+                <?php elseif (count($processes) > 0): ?>
+                    Found <?= count($processes) ?> processes in database.
+                <?php else: ?>
+                    No processes found. Create your first process!
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- View Tab -->
+        <div class="tab-content" id="view-tab">
+            <div class="tab-header">
+                <h2>
+                    <span class="tab-icon">👁️</span>
+                    Process View & Analysis
+                </h2>
+                <p>View and analyze saved business processes with advanced animation</p>
+            </div>
+
+            <!-- Animation Status -->
+            <div class="animation-status" id="animation-status">
+                <span>🎬</span>
+                <div>
+                    <strong>Animation Status:</strong>
+                    <span id="animation-text">Ready to animate</span>
+                </div>
+                <div style="margin-left: auto;">
+                    <strong>Run #<span id="animation-run-count">0</span></strong>
+                </div>
+            </div>
+
+            <!-- Process Selector for Viewer -->
+            <div class="process-selector">
+                <select id="viewer-process-select">
+                    <option value="">Choose a process to view...</option>
+                    <?php if (!empty($processes)): ?>
                         <?php foreach ($processes as $process): ?>
                             <option value="<?= $process['id'] ?>" data-xml="<?= htmlspecialchars($process['model_data']) ?>">
                                 <?= htmlspecialchars($process['name']) ?> 
@@ -755,267 +817,196 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                                 <?php endif; ?>
                             </option>
                         <?php endforeach; ?>
-                    </select>
-                    <button class="btn btn-warning" id="btn-assign-fullscreen">
-                        🖥️ Full Screen
-                    </button>
-                </div>
-
-                <!-- BPMN Editor -->
-                <div id="bpmn-editor">
-                    <div class="loading">Loading BPMN Editor...</div>
-                </div>
-
-                <!-- Design Toolbar -->
-                <div class="toolbar">
-                    <button class="btn btn-primary" id="btn-new-process">
-                        📄 New Process
-                    </button>
-                    <button class="btn btn-secondary" id="btn-save-process">
-                        💾 Save Process
-                    </button>
-                    <button class="btn btn-warning" id="btn-clear-designer">
-                        🗑️ Clear Designer
-                    </button>
-                    <button class="btn btn-secondary" id="btn-validate-process">
-                        ✅ Validate
-                    </button>
-                    <button class="btn btn-secondary" id="btn-zoom-in">
-                        🔍+ Zoom In
-                    </button>
-                    <button class="btn btn-secondary" id="btn-zoom-out">
-                        🔍- Zoom Out
-                    </button>
-                    <button class="btn btn-secondary" id="btn-zoom-fit">
-                        📐 Fit to Screen
-                    </button>
-                    <button class="btn btn-success" id="btn-export-xml">
-                        📤 Export to Viewer
-                    </button>
-                    <button class="btn btn-warning" id="btn-design-fullscreen">
-                        🖥️ Full Screen
-                    </button>
-                </div>
-
-                <div class="status-bar">
-                    <span class="token"></span> Use the toolbar above to create and edit your process models.
-                    <?php if (!empty($db_error)): ?>
-                        <strong>Database Error:</strong> <?= htmlspecialchars($db_error) ?>
-                    <?php elseif (count($processes) > 0): ?>
-                        Found <?= count($processes) ?> processes in database.
                     <?php else: ?>
-                        No processes found. Create your first process!
+                        <option value="" disabled>No processes found in database</option>
                     <?php endif; ?>
+                </select>
+            </div>
+
+            <!-- BPMN Viewer -->
+            <div id="bpmn-viewer">
+                <div class="loading">👆 Select a process from the dropdown above to view it here...</div>
+            </div>
+
+            <div class="toolbar">
+                <button class="btn btn-primary" id="btn-animate-path">
+                    🎬 Animate Process
+                </button>
+                <button class="btn btn-danger" id="btn-clear-highlights">
+                    ⏹️ Stop & Clear
+                </button>
+                <button class="btn btn-warning" id="btn-analyze-bottlenecks">
+                    🔍 Analyze Bottlenecks
+                </button>
+                <button class="btn btn-success" id="btn-refresh-viewer">
+                    🔄 Refresh Viewer
+                </button>
+                <button class="btn btn-secondary" id="btn-viewer-zoom-fit">
+                    🔍 Fit to Screen
+                </button>
+            </div>
+
+            <!-- Color Legend -->
+            <div class="color-legend">
+                <h4>🎨 Animation Colors Legend</h4>
+                <div class="legend-items" id="color-legend-items">
+                    <!-- Dynamic legend items will be populated by JavaScript -->
                 </div>
             </div>
         </div>
 
-        <!-- View Panel -->
-        <div class="panel collapsed" id="view-panel">
-            <div class="panel-header" onclick="togglePanel('view')">
+        <!-- Assign Tab -->
+        <div class="tab-content" id="assign-tab">
+            <div class="tab-header">
                 <h2>
-                    <div class="panel-icon" style="background: var(--macta-teal);">👁️</div>
-                    Process View & Analysis
-                </h2>
-                <button class="panel-toggle">▼</button>
-            </div>
-            
-            <div class="panel-content" style="display: none;">
-                <!-- Debug: This should show when panel is expanded -->
-                <div style="background: #e8f5e8; padding: 10px; margin-bottom: 10px; border-radius: 5px;">
-                    <strong>🔧 Debug:</strong> If you can see this message, the panel content is working!
-                </div>
-                
-                <!-- Process Selector for Viewer -->
-                <div class="process-selector" style="margin-bottom: 20px;">
-                    <label style="display: block; margin-bottom: 5px; font-weight: bold; color: var(--macta-dark);">
-                        Select Process to View:
-                    </label>
-                    <select id="viewer-process-select" style="width: 100%; padding: 12px; border: 2px solid var(--macta-teal); border-radius: 8px; font-size: 14px; background: white;">
-                        <option value="">Choose a process to view...</option>
-                        <?php if (!empty($processes)): ?>
-                            <?php foreach ($processes as $process): ?>
-                                <option value="<?= $process['id'] ?>" data-xml="<?= htmlspecialchars($process['model_data']) ?>">
-                                    <?= htmlspecialchars($process['name']) ?> 
-                                    <?php if ($process['project_name']): ?>
-                                        (<?= htmlspecialchars($process['project_name']) ?>)
-                                    <?php endif; ?>
-                                </option>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <option value="" disabled>No processes found in database</option>
-                        <?php endif; ?>
-                    </select>
-                </div>
-
-                <!-- BPMN Viewer -->
-                <div id="bpmn-viewer" style="height: 650px; border: 2px solid var(--macta-light); border-radius: 10px; background: #f8f9fa;">
-                    <div class="loading" style="display: flex; align-items: center; justify-content: center; height: 100%; font-size: 16px; color: var(--macta-teal);">
-                        👆 Select a process from the dropdown above to view it here...
-                    </div>
-                </div>
-
-                <div class="toolbar">
-                    <button class="btn btn-primary" id="btn-animate-path">
-                        🎬 Animate Process
-                    </button>
-                    <button class="btn btn-secondary" id="btn-clear-highlights">
-                        ⏹️ Stop & Clear
-                    </button>
-                    <button class="btn btn-warning" id="btn-analyze-bottlenecks">
-                        🔍 Analyze Bottlenecks
-                    </button>
-                    <button class="btn btn-success" id="btn-refresh-viewer">
-                        🔄 Refresh Viewer
-                    </button>
-                    <button class="btn btn-secondary" id="btn-viewer-zoom-in">
-                        🔍+ Zoom In
-                    </button>
-                    <button class="btn btn-secondary" id="btn-viewer-zoom-out">
-                        🔍- Zoom Out
-                    </button>
-                    <button class="btn btn-secondary" id="btn-viewer-zoom-fit">
-                        📐 Fit to Screen
-                    </button>
-                    <button class="btn btn-warning" id="btn-viewer-fullscreen">
-                        🖥️ Full Screen
-                    </button>
-                </div>
-
-                <div class="legend">
-                    <strong>🎯 Process Analysis Features:</strong><br>
-                    <span class="token"></span> <strong>Select Process:</strong> Choose any process from your database (<?= count($processes) ?> available)<br>
-                    <span class="token"></span> <strong>Animate:</strong> Shows process flow step by step<br>
-                    <span class="token"></span> <strong>Analyze:</strong> Identifies potential bottlenecks<br>
-                    <span class="token"></span> <strong>Refresh:</strong> Reload the current process in viewer
-                </div>
-            </div>
-        </div>
-
-        <!-- Assign Panel -->
-        <div class="panel collapsed" id="assign-panel">
-            <div class="panel-header" onclick="togglePanel('assign')">
-                <h2>
-                    <div class="panel-icon" style="background: var(--macta-yellow);">👥</div>
+                    <span class="tab-icon">👥</span>
                     Resource Assignment
                 </h2>
-                <button class="panel-toggle">▼</button>
+                <p>Assign resources, roles, and responsibilities to process steps</p>
             </div>
-            
-            <div class="panel-content">
-                <div style="padding: 20px;">
-                    <h4>Assign Resources to Process Tasks</h4>
-                    <div class="assignment-form">
-                        <select id="task-name">
-                            <option value="">Select Task...</option>
-                        </select>
-                        <select id="assigned-user">
-                            <option value="">Select User...</option>
-                            <option value="john.doe">John Doe - Process Analyst</option>
-                            <option value="jane.smith">Jane Smith - Operations Manager</option>
-                            <option value="mike.wilson">Mike Wilson - Quality Specialist</option>
-                            <option value="sarah.connor">Sarah Connor - Team Lead</option>
-                            <option value="alex.murphy">Alex Murphy - Senior Consultant</option>
-                        </select>
-                        <input type="number" placeholder="Duration (hours)" id="task-duration">
-                        <input type="text" placeholder="Required Skills" id="task-skills">
-                        <select id="priority-level">
-                            <option value="">Priority Level...</option>
-                            <option value="low">Low Priority</option>
-                            <option value="medium">Medium Priority</option>
-                            <option value="high">High Priority</option>
-                            <option value="critical">Critical</option>
-                        </select>
-                        <input type="number" placeholder="Cost per Hour ($)" id="task-cost">
-                        <button class="btn btn-success" id="btn-assign-resource" style="grid-column: 1 / -1;">
-                            ✅ Assign Resource
-                        </button>
-                    </div>
+
+            <div class="assignment-panel">
+                <h4>Assign Resources to Process Tasks</h4>
+                <div class="assignment-form">
+                    <select id="task-name">
+                        <option value="">Select Task...</option>
+                    </select>
+                    <select id="assigned-user">
+                        <option value="">Select User...</option>
+                        <option value="john.doe">John Doe - Process Analyst</option>
+                        <option value="jane.smith">Jane Smith - Operations Manager</option>
+                        <option value="mike.wilson">Mike Wilson - Quality Specialist</option>
+                        <option value="sarah.connor">Sarah Connor - Team Lead</option>
+                        <option value="alex.murphy">Alex Murphy - Senior Consultant</option>
+                    </select>
+                    <input type="number" placeholder="Duration (hours)" id="task-duration">
+                    <input type="text" placeholder="Required Skills" id="task-skills">
+                    <select id="priority-level">
+                        <option value="">Priority Level...</option>
+                        <option value="low">Low Priority</option>
+                        <option value="medium">Medium Priority</option>
+                        <option value="high">High Priority</option>
+                        <option value="critical">Critical</option>
+                    </select>
+                    <input type="number" placeholder="Cost per Hour ($)" id="task-cost">
+                    <button class="btn btn-success" id="btn-assign-resource" style="grid-column: 1 / -1;">
+                        ✅ Assign Resource
+                    </button>
                 </div>
             </div>
         </div>
 
-        <!-- Simulate Panel -->
-        <div class="panel collapsed" id="simulate-panel">
-            <div class="panel-header" onclick="togglePanel('simulate')">
+        <!-- Simulate Tab -->
+        <div class="tab-content" id="simulate-tab">
+            <div class="tab-header">
                 <h2>
-                    <div class="panel-icon" style="background: var(--macta-green);">🎯</div>
+                    <span class="tab-icon">⚡</span>
                     Process Simulation
                 </h2>
-                <button class="panel-toggle">▼</button>
+                <p>Run advanced simulations with different scenarios and color-coded runs</p>
+            </div>
+
+            <!-- Animation Status for Simulation -->
+            <div class="animation-status" id="simulation-status">
+                <span>⚡</span>
+                <div>
+                    <strong>Simulation Status:</strong>
+                    <span id="simulation-text">Ready to simulate</span>
+                </div>
+                <div style="margin-left: auto;">
+                    <strong>Total Runs: <span id="simulation-run-count">0</span></strong>
+                </div>
+            </div>
+
+            <!-- Simulation Controls -->
+            <div class="toolbar">
+                <button class="btn btn-success" id="btn-start-simulation">
+                    ▶️ Start Simulation
+                </button>
+                <button class="btn btn-warning" id="btn-pause-simulation">
+                    ⏸️ Pause
+                </button>
+                <button class="btn btn-danger" id="btn-stop-simulation">
+                    ⏹️ Stop
+                </button>
+                <button class="btn btn-secondary" id="btn-reset-simulation">
+                    🔄 Reset All
+                </button>
+                <div style="margin-left: auto; display: flex; align-items: center; gap: 10px;">
+                    <label>Speed:</label>
+                    <input type="range" id="sim-speed" min="0.5" max="3" step="0.1" value="1" style="width: 100px;">
+                    <span id="speed-display">1x</span>
+                </div>
+            </div>
+
+            <!-- Simulation Viewer -->
+            <div id="simulation-viewer">
+                <div class="loading">Click Start Simulation to begin...</div>
             </div>
             
-            <div class="panel-content">
-                <div class="simulation-controls" style="display: flex; margin-bottom: 15px;">
-                    <button class="btn btn-success" id="btn-start-simulation">
-                        ▶️ Start Simulation
-                    </button>
-                    <button class="btn btn-warning" id="btn-pause-simulation">
-                        ⏸️ Pause
-                    </button>
-                    <button class="btn btn-secondary" id="btn-stop-simulation">
-                        ⏹️ Stop
-                    </button>
-                    <button class="btn btn-warning" id="btn-simulate-fullscreen">
-                        🖥️ Full Screen
-                    </button>
-                    <div style="margin-left: auto; display: flex; align-items: center; gap: 10px;">
-                        <label>Speed:</label>
-                        <input type="range" id="sim-speed" min="0.5" max="3" step="0.1" value="1" style="width: 100px;">
-                        <span id="speed-display">1x</span>
-                    </div>
+            <div class="performance-metrics">
+                <div class="metric-card">
+                    <div class="metric-value" id="total-time">--</div>
+                    <div class="metric-label">Total Process Time</div>
                 </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="active-tokens">0</div>
+                    <div class="metric-label">Active Tokens</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="completed-instances">0</div>
+                    <div class="metric-label">Completed Instances</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="efficiency-score">--</div>
+                    <div class="metric-label">Efficiency Score</div>
+                </div>
+            </div>
 
-                <!-- Simulation Viewer -->
-                <div id="simulation-viewer" style="height: 550px; border: 2px solid var(--macta-light); border-radius: 10px; margin-bottom: 15px;">
-                    <div class="loading">Click Start Simulation to begin...</div>
-                </div>
-                
-                <div class="performance-metrics">
-                    <div class="metric-card">
-                        <div class="metric-value" id="total-time">--</div>
-                        <div class="metric-label">Total Process Time</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-value" id="active-tokens">0</div>
-                        <div class="metric-label">Active Tokens</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-value" id="completed-instances">0</div>
-                        <div class="metric-label">Completed Instances</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-value" id="efficiency-score">--</div>
-                        <div class="metric-label">Efficiency Score</div>
-                    </div>
-                </div>
-
-                <div class="legend">
-                    <strong>🎯 Simulation Features:</strong><br>
-                    <span class="token"></span> <strong>Real-time:</strong> Live process execution monitoring<br>
-                    <span class="token"></span> <strong>Metrics:</strong> Performance indicators and efficiency scores<br>
-                    <span class="token"></span> <strong>Speed Control:</strong> Adjust simulation speed from 0.5x to 3x<br>
-                    <span class="token"></span> <strong>Analysis:</strong> Bottleneck detection and optimization suggestions
+            <!-- Color Legend for Simulation -->
+            <div class="color-legend">
+                <h4>🎨 Simulation Color System</h4>
+                <p>Each simulation run gets a unique color that persists until reset</p>
+                <div class="legend-items" id="simulation-legend-items">
+                    <!-- Dynamic legend items will be populated by JavaScript -->
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- BPMN.js scripts from CDN with fallback -->
+    <!-- BPMN.js scripts -->
     <script>
         // Store PHP data for JavaScript
         const processes = <?= json_encode($processes) ?>;
         const projects = <?= json_encode($projects) ?>;
         const dbError = <?= json_encode($db_error) ?>;
         
-        // Check for database errors
-        if (dbError) {
-            console.error('Database Error:', dbError);
-            document.querySelector('#bpmn-editor .loading').innerHTML = 'Database connection failed: ' + dbError;
-            document.querySelector('#bpmn-viewer .loading').innerHTML = 'Database connection failed: ' + dbError;
-        }
+        // Global variables
+        let modeler = null;
+        let viewer = null;
+        let simulationViewer = null;
+        let currentXML = null;
+        let animationRunCount = 0;
+        let simulationRunCount = 0;
+        let isAnimating = false;
+        let isSimulating = false;
+        let animationTimeouts = [];
+        let simulationTimeouts = [];
+        let simulationInterval = null;
         
-        // Fallback BPMN XML for when no process is selected
+        // Animation colors system
+        const animationColors = [
+            { name: 'Red Flow', css: 'animation-run-1', color: '#FF6B6B' },
+            { name: 'Teal Flow', css: 'animation-run-2', color: '#4ECDC4' },
+            { name: 'Blue Flow', css: 'animation-run-3', color: '#45B7D1' },
+            { name: 'Green Flow', css: 'animation-run-4', color: '#96CEB4' },
+            { name: 'Yellow Flow', css: 'animation-run-5', color: '#FFEAA7' },
+            { name: 'Purple Flow', css: 'animation-run-6', color: '#DDA0DD' },
+            { name: 'Mint Flow', css: 'animation-run-7', color: '#98D8C8' },
+            { name: 'Gold Flow', css: 'animation-run-8', color: '#F7DC6F' }
+        ];
+        
+        // Default BPMN XML
         const defaultBpmnXml = `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn2:definitions xmlns:bpmn2="http://www.omg.org/spec/BPMN/20100524/MODEL" 
                    xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" 
@@ -1027,45 +1018,74 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     <bpmn2:startEvent id="StartEvent_1" name="Start">
       <bpmn2:outgoing>Flow_1</bpmn2:outgoing>
     </bpmn2:startEvent>
-    <bpmn2:endEvent id="EndEvent_1" name="End">
+    <bpmn2:task id="Task_1" name="Sample Task">
       <bpmn2:incoming>Flow_1</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_2</bpmn2:outgoing>
+    </bpmn2:task>
+    <bpmn2:endEvent id="EndEvent_1" name="End">
+      <bpmn2:incoming>Flow_2</bpmn2:incoming>
     </bpmn2:endEvent>
-    <bpmn2:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="EndEvent_1"/>
+    <bpmn2:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Task_1" />
+    <bpmn2:sequenceFlow id="Flow_2" sourceRef="Task_1" targetRef="EndEvent_1" />
   </bpmn2:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Process_1">
       <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
         <dc:Bounds x="150" y="200" width="36" height="36"/>
       </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_1_di" bpmnElement="Task_1">
+        <dc:Bounds x="250" y="178" width="100" height="80"/>
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="EndEvent_1_di" bpmnElement="EndEvent_1">
-        <dc:Bounds x="300" y="200" width="36" height="36"/>
+        <dc:Bounds x="400" y="200" width="36" height="36"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
         <di:waypoint x="186" y="218"/>
-        <di:waypoint x="300" y="218"/>
+        <di:waypoint x="250" y="218"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
+        <di:waypoint x="350" y="218"/>
+        <di:waypoint x="400" y="218"/>
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
 </bpmn2:definitions>`;
 
-        let modeler = null;
-        let viewer = null;
-        let simulationViewer = null;
-        let currentXML = defaultBpmnXml;
-        let simulationActive = false;
-        let simulationInterval = null;
-        let animationInterval = null;
-        let currentAnimationTimeout = null;
+        // Tab switching functionality
+        function switchTab(tabName) {
+            console.log('Switching to tab:', tabName);
+            
+            // Update tab buttons
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
 
-        // Load scripts dynamically with multiple fallback options
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+
+            // Initialize specific tab content
+            setTimeout(() => {
+                if (tabName === 'view' && viewer && currentXML) {
+                    loadProcessInViewer(currentXML);
+                } else if (tabName === 'simulate' && simulationViewer && currentXML) {
+                    loadProcessInSimulation(currentXML);
+                } else if (tabName === 'assign') {
+                    loadProcessTasks();
+                }
+            }, 100);
+        }
+
+        // Load scripts dynamically with fallback
         function loadScript(urls, callback) {
             let currentIndex = 0;
             
             function tryNextUrl() {
                 if (currentIndex >= urls.length) {
                     console.error('All CDN sources failed');
-                    document.querySelector('#bpmn-editor .loading').innerHTML = 'Failed to load BPMN libraries from all sources. Please check your internet connection.';
-                    document.querySelector('#bpmn-viewer .loading').innerHTML = 'Failed to load BPMN libraries from all sources. Please check your internet connection.';
                     return;
                 }
                 
@@ -1083,596 +1103,386 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             tryNextUrl();
         }
 
-        // Initialize BPMN.js with fallback CDNs
+        // Initialize BPMN.js
         function initializeBpmn() {
             const bpmnCdnUrls = [
                 'https://unpkg.com/bpmn-js@17.0.0/dist/bpmn-modeler.development.js',
                 'https://cdn.jsdelivr.net/npm/bpmn-js@17.0.0/dist/bpmn-modeler.development.js',
-                'https://unpkg.com/bpmn-js@16.0.0/dist/bpmn-modeler.development.js',
-                'https://unpkg.com/bpmn-js@15.0.0/dist/bpmn-modeler.development.js'
+                'https://unpkg.com/bpmn-js@16.0.0/dist/bpmn-modeler.development.js'
             ];
             
             loadScript(bpmnCdnUrls, () => {
                 try {
-                    // Check if BpmnJS is available
                     if (typeof BpmnJS === 'undefined') {
                         throw new Error('BpmnJS not loaded');
                     }
                     
+                    // Initialize modeler
                     modeler = new BpmnJS({
                         container: '#bpmn-editor'
+                    });
+                    
+                    // Initialize viewer
+                    viewer = new BpmnJS({
+                        container: '#bpmn-viewer'
+                    });
+                    
+                    // Initialize simulation viewer
+                    simulationViewer = new BpmnJS({
+                        container: '#simulation-viewer'
                     });
                     
                     // Load initial process
                     loadInitialProcess();
                     
-                    // Initialize viewer
-                    initializeViewer();
+                    console.log('✅ BPMN components initialized successfully');
                     
                 } catch (error) {
-                    console.error('Failed to initialize BPMN modeler:', error);
-                    document.querySelector('#bpmn-editor .loading').innerHTML = 'BPMN Editor initialization failed: ' + error.message;
-                    
-                    // Try simplified initialization
-                    initializeSimplifiedEditor();
+                    console.error('Failed to initialize BPMN:', error);
+                    document.querySelector('#bpmn-editor .loading').innerHTML = 'BPMN initialization failed: ' + error.message;
                 }
             });
         }
 
-        // Simplified editor as fallback
-        function initializeSimplifiedEditor() {
-            document.querySelector('#bpmn-editor .loading').innerHTML = `
-                <div style="text-align: center; padding: 20px;">
-                    <h3>Simplified Process Editor</h3>
-                    <p>Advanced BPMN editor failed to load. You can still:</p>
-                    <button onclick="window.open('../index.php', '_blank')" class="btn btn-primary" style="margin: 10px;">
-                        Open Visual Process Builder
-                    </button>
-                    <br>
-                    <textarea id="xml-editor" placeholder="Paste BPMN XML here..." style="width: 100%; height: 200px; margin-top: 10px;"></textarea>
-                </div>
-            `;
-            
-            // Enable basic XML editing
-            setupXmlEditor();
-        }
-
-        function setupXmlEditor() {
-            const xmlEditor = document.getElementById('xml-editor');
-            if (xmlEditor) {
-                xmlEditor.value = currentXML;
-                xmlEditor.addEventListener('change', () => {
-                    currentXML = xmlEditor.value;
-                    if (viewer) {
-                        loadProcessInViewer(currentXML);
-                    }
-                });
-            }
-        }
-
-        // Initialize viewer with dedicated simulation viewer
-        function initializeViewer() {
-            try {
-                if (typeof BpmnJS !== 'undefined') {
-                    viewer = new BpmnJS({
-                        container: '#bpmn-viewer'
-                    });
-                    
-                    // Also create simulation viewer
-                    simulationViewer = new BpmnJS({
-                        container: '#simulation-viewer'
-                    });
-                    
-                    loadProcessInViewer(currentXML);
-                } else {
-                    // Fallback viewer
-                    initializeSimplifiedViewer();
-                }
-                
-            } catch (error) {
-                console.error('Failed to initialize BPMN viewer:', error);
-                initializeSimplifiedViewer();
-            }
-        }
-
-        // Simplified viewer as fallback
-        function initializeSimplifiedViewer() {
-            document.querySelector('#bpmn-viewer .loading').innerHTML = `
-                <div style="text-align: center; padding: 20px;">
-                    <h3>Process XML Viewer</h3>
-                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: left; max-height: 400px; overflow-y: auto;">
-                        <pre id="xml-display" style="font-size: 12px; margin: 0;">${escapeHtml(currentXML)}</pre>
-                    </div>
-                    <p style="margin-top: 10px; font-size: 12px; color: #666;">
-                        BPMN viewer failed to load. Showing XML content instead.
-                    </p>
-                </div>
-            `;
-        }
-
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        // Load initial process with better error handling
+        // Load initial process
         async function loadInitialProcess() {
             try {
                 let xmlToLoad = defaultBpmnXml;
                 
                 if (processes.length > 0 && processes[0].model_data) {
-                    // Load first process from database
                     xmlToLoad = processes[0].model_data;
-                    currentXML = xmlToLoad;
-                    console.log('Loading process:', processes[0].name);
                 }
+                
+                currentXML = xmlToLoad;
                 
                 if (modeler) {
                     await modeler.importXML(xmlToLoad);
-                    
-                    // Fix canvas display issues
-                    const canvas = modeler.get('canvas');
-                    canvas.zoom('fit-viewport');
-                    
-                    // Force re-render to fix missing elements
-                    setTimeout(() => {
-                        canvas.zoom(canvas.zoom());
-                    }, 100);
-                    
-                    console.log('Process loaded successfully in editor');
+                    modeler.get('canvas').zoom('fit-viewport');
                 }
                 
-                // Hide loading indicator
-                const editorLoading = document.querySelector('#bpmn-editor .loading');
-                if (editorLoading) {
-                    editorLoading.style.display = 'none';
-                }
+                // Hide loading indicators
+                document.querySelectorAll('.loading').forEach(el => el.style.display = 'none');
+                
+                // Initialize color legends
+                updateColorLegends();
                 
             } catch (error) {
                 console.error('Failed to load initial process:', error);
-                
-                // Try loading default XML
-                try {
-                    if (modeler) {
-                        await modeler.importXML(defaultBpmnXml);
-                        const canvas = modeler.get('canvas');
-                        canvas.zoom('fit-viewport');
-                        
-                        // Force re-render
-                        setTimeout(() => {
-                            canvas.zoom(canvas.zoom());
-                        }, 100);
-                    }
-                } catch (fallbackError) {
-                    console.error('Failed to load fallback process:', fallbackError);
-                    initializeSimplifiedEditor();
-                }
-                
-                const editorLoading = document.querySelector('#bpmn-editor .loading');
-                if (editorLoading) {
-                    editorLoading.style.display = 'none';
-                }
             }
         }
 
-        // Load process in viewer with better error handling
+        // Load process in viewer
         async function loadProcessInViewer(xml) {
-            if (!viewer) {
-                console.log('Viewer not initialized yet');
-                return;
-            }
+            if (!viewer) return;
             
             try {
                 await viewer.importXML(xml);
                 viewer.get('canvas').zoom('fit-viewport');
                 
-                // Hide loading indicator
                 const viewerLoading = document.querySelector('#bpmn-viewer .loading');
                 if (viewerLoading) {
                     viewerLoading.style.display = 'none';
                 }
                 
-                console.log('Process loaded successfully in viewer');
-                
             } catch (error) {
                 console.error('Failed to load process in viewer:', error);
-                const viewerLoading = document.querySelector('#bpmn-viewer .loading');
-                if (viewerLoading) {
-                    viewerLoading.innerHTML = 'Failed to load process in viewer: ' + error.message;
-                }
             }
         }
 
-        // Panel toggle functionality
-        function togglePanel(panelName) {
-            const panels = ['design', 'view', 'assign', 'simulate'];
-            
-            console.log('Toggling panel:', panelName);
-            
-            // Update header tabs
-            document.querySelectorAll('.nav-tab').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            
-            panels.forEach(name => {
-                const panel = document.getElementById(`${name}-panel`);
-                const toggle = panel.querySelector('.panel-toggle');
-                const content = panel.querySelector('.panel-content');
-                
-                if (name === panelName) {
-                    // Expand clicked panel
-                    panel.classList.remove('collapsed');
-                    panel.classList.add('expanded');
-                    toggle.classList.add('expanded');
-                    
-                    // Force show content
-                    if (content) {
-                        content.style.display = 'flex';
-                        console.log(`Panel ${name} content made visible`);
-                    }
-                    
-                    // Update header tab
-                    const headerTab = document.querySelector(`[onclick="togglePanel('${name}')"]`);
-                    if (headerTab) {
-                        headerTab.classList.add('active');
-                    }
-                    
-                    // Special handling for different panels
-                    if (name === 'view') {
-                        console.log('View panel opened, setting up viewer...');
-                        // Don't auto-export, let user select from dropdown
-                    }
-                    
-                    if (name === 'simulate') {
-                        // Load current process into simulation
-                        setTimeout(async () => {
-                            if (modeler) {
-                                try {
-                                    const { xml } = await modeler.saveXML({ format: true });
-                                    currentXML = xml;
-                                    console.log('Auto-exporting current process to simulation');
-                                } catch (error) {
-                                    console.error('Failed to export current process:', error);
-                                }
-                            }
-                            
-                            // Force load process in simulation viewer
-                            if (simulationViewer && currentXML) {
-                                try {
-                                    await simulationViewer.importXML(currentXML);
-                                    simulationViewer.get('canvas').zoom('fit-viewport');
-                                    
-                                    // Hide loading indicator
-                                    const simLoading = document.querySelector('#simulation-viewer .loading');
-                                    if (simLoading) {
-                                        simLoading.style.display = 'none';
-                                    }
-                                    
-                                    console.log('Process loaded in simulation viewer successfully');
-                                } catch (error) {
-                                    console.error('Failed to load process in simulation viewer:', error);
-                                }
-                            }
-                        }, 400);
-                    }
-                    
-                    if (name === 'assign') {
-                        // Load process tasks into assignment dropdown
-                        setTimeout(() => {
-                            loadProcessTasks();
-                        }, 300);
-                    }
-                    
-                } else {
-                    // Collapse other panels
-                    panel.classList.remove('expanded');
-                    panel.classList.add('collapsed');
-                    toggle.classList.remove('expanded');
-                    
-                    // Hide content
-                    if (content) {
-                        content.style.display = 'none';
-                    }
-                }
-            });
-            
-            // Re-fit canvas when panel is opened
-            setTimeout(() => {
-                if (panelName === 'design' && modeler) {
-                    modeler.get('canvas').zoom('fit-viewport');
-                } else if ((panelName === 'view') && viewer) {
-                    viewer.get('canvas').zoom('fit-viewport');
-                } else if ((panelName === 'simulate') && simulationViewer) {
-                    simulationViewer.get('canvas').zoom('fit-viewport');
-                }
-            }, 600);
-        }
-
-        // Dedicated function to export and load to viewer
-        async function exportAndLoadToViewer() {
-            console.log('Starting export and load to viewer...');
-            
-            // Block any alerts that might be triggered during export
-            const tempAlert = window.alert;
-            window.alert = () => {};
+        // Load process in simulation
+        async function loadProcessInSimulation(xml) {
+            if (!simulationViewer) return;
             
             try {
-                // Step 1: Export current process from modeler
-                if (modeler) {
-                    try {
-                        const { xml } = await modeler.saveXML({ format: true });
-                        currentXML = xml;
-                        console.log('Current XML exported successfully');
-                    } catch (error) {
-                        console.error('Failed to export current process:', error);
-                        return;
-                    }
-                }
+                await simulationViewer.importXML(xml);
+                simulationViewer.get('canvas').zoom('fit-viewport');
                 
-                // Step 2: Wait for viewer panel to be ready
-                setTimeout(async () => {
-                    console.log('Loading process into viewer...');
-                    
-                    // Step 3: Re-initialize viewer to avoid cached issues
-                    if (typeof BpmnJS !== 'undefined') {
-                        try {
-                            // Destroy existing viewer if it exists
-                            if (viewer) {
-                                try {
-                                    viewer.destroy();
-                                } catch (e) {
-                                    console.warn('Error destroying viewer:', e);
-                                }
-                            }
-                            
-                            // Create fresh viewer instance
-                            viewer = new BpmnJS({
-                                container: '#bpmn-viewer'
-                            });
-                            console.log('Fresh viewer initialized');
-                        } catch (error) {
-                            console.error('Failed to initialize viewer:', error);
-                            return;
-                        }
-                    }
-                    
-                    // Step 4: Load process in viewer with comprehensive error handling
-                    if (viewer && currentXML) {
-                        try {
-                            // Import new XML
-                            await viewer.importXML(currentXML);
-                            
-                            // Safe zoom with multiple fallbacks
-                            const canvas = viewer.get('canvas');
-                            try {
-                                canvas.zoom('fit-viewport');
-                            } catch (zoomError1) {
-                                console.warn('Fit viewport failed, trying zoom(1):', zoomError1);
-                                try {
-                                    canvas.zoom(1);
-                                } catch (zoomError2) {
-                                    console.warn('Zoom(1) failed, using setZoom:', zoomError2);
-                                    try {
-                                        canvas.setZoom(1);
-                                    } catch (zoomError3) {
-                                        console.warn('All zoom methods failed:', zoomError3);
-                                    }
-                                }
-                            }
-                            
-                            // Hide loading indicator
-                            const viewerLoading = document.querySelector('#bpmn-viewer .loading');
-                            if (viewerLoading) {
-                                viewerLoading.style.display = 'none';
-                            }
-                            
-                            console.log('Process loaded in viewer successfully!');
-                            
-                        } catch (error) {
-                            console.error('Failed to load process in viewer:', error);
-                            const viewerLoading = document.querySelector('#bpmn-viewer .loading');
-                            if (viewerLoading) {
-                                viewerLoading.innerHTML = 'Failed to load process: ' + error.message;
-                            }
-                        }
-                    } else {
-                        console.error('Viewer not available or no XML to load');
-                        const viewerLoading = document.querySelector('#bpmn-viewer .loading');
-                        if (viewerLoading) {
-                            viewerLoading.innerHTML = 'Viewer initialization failed or no process to load';
-                        }
-                    }
-                }, 600);
-                
-            } finally {
-                // Restore alert function after a delay
-                setTimeout(() => {
-                    window.alert = tempAlert;
-                }, 1000);
-            }
-        }
-
-        // Direct viewer loading function with better error handling
-        async function loadProcessInViewerDirectly(xmlData) {
-            console.log('Starting direct viewer load...');
-            console.log('XML data length:', xmlData ? xmlData.length : 'No data');
-            
-            try {
-                // Always recreate viewer to avoid cached transform issues
-                if (viewer) {
-                    try {
-                        viewer.destroy();
-                        console.log('Previous viewer destroyed');
-                    } catch (e) {
-                        console.warn('Error destroying viewer:', e);
-                    }
-                }
-                
-                // Clear the container completely
-                const container = document.getElementById('bpmn-viewer');
-                container.innerHTML = '<div class="loading" style="display: flex; align-items: center; justify-content: center; height: 100%; font-size: 16px; color: var(--macta-teal);">🔄 Loading process...</div>';
-                
-                // Wait a moment for DOM to clear
-                await new Promise(resolve => setTimeout(resolve, 100));
-                
-                // Create completely fresh viewer instance
-                if (typeof BpmnJS !== 'undefined') {
-                    try {
-                        console.log('Creating fresh viewer instance...');
-                        viewer = new BpmnJS({
-                            container: '#bpmn-viewer',
-                            // Add configuration to prevent transform errors
-                            canvas: {
-                                deferUpdate: false
-                            }
-                        });
-                        console.log('Fresh viewer initialized for direct loading');
-                    } catch (error) {
-                        console.error('Failed to initialize viewer:', error);
-                        const viewerLoading = document.querySelector('#bpmn-viewer .loading');
-                        if (viewerLoading) {
-                            viewerLoading.style.display = 'flex';
-                            viewerLoading.innerHTML = '❌ Failed to initialize viewer: ' + error.message;
-                        }
-                        return;
-                    }
-                }
-                
-                // Load the process with better error handling
-                if (viewer && xmlData) {
-                    try {
-                        console.log('Importing XML into fresh viewer...');
-                        await viewer.importXML(xmlData);
-                        console.log('XML imported successfully');
-                        
-                        // Wait for rendering to complete
-                        await new Promise(resolve => setTimeout(resolve, 200));
-                        
-                        // Safe zoom with multiple fallbacks
-                        const canvas = viewer.get('canvas');
-                        try {
-                            canvas.zoom('fit-viewport');
-                            console.log('Zoom fit-viewport successful');
-                        } catch (zoomError1) {
-                            console.warn('Fit viewport failed, trying zoom(1)');
-                            try {
-                                canvas.zoom(1);
-                                console.log('Zoom(1) successful');
-                            } catch (zoomError2) {
-                                console.warn('Zoom(1) failed, trying manual zoom');
-                                try {
-                                    canvas.viewbox({ x: 0, y: 0, width: 800, height: 600 });
-                                    console.log('Manual viewbox set');
-                                } catch (zoomError3) {
-                                    console.warn('All zoom methods failed, continuing without zoom');
-                                }
-                            }
-                        }
-                        
-                        // Hide loading indicator
-                        const viewerLoading = document.querySelector('#bpmn-viewer .loading');
-                        if (viewerLoading) {
-                            viewerLoading.style.display = 'none';
-                        }
-                        
-                        console.log('✅ Process loaded directly in viewer successfully!');
-                        
-                    } catch (importError) {
-                        console.error('Failed to import XML in viewer:', importError);
-                        const viewerLoading = document.querySelector('#bpmn-viewer .loading');
-                        if (viewerLoading) {
-                            viewerLoading.style.display = 'flex';
-                            viewerLoading.innerHTML = `❌ Failed to load process: ${importError.message}`;
-                        }
-                    }
-                } else {
-                    const errorMsg = !viewer ? 'Viewer not available' : 'No XML data provided';
-                    console.error(errorMsg);
-                    const viewerLoading = document.querySelector('#bpmn-viewer .loading');
-                    if (viewerLoading) {
-                        viewerLoading.style.display = 'flex';
-                        viewerLoading.innerHTML = `❌ ${errorMsg}`;
-                    }
+                const simLoading = document.querySelector('#simulation-viewer .loading');
+                if (simLoading) {
+                    simLoading.style.display = 'none';
                 }
                 
             } catch (error) {
-                console.error('Error in direct viewer loading:', error);
-                const viewerLoading = document.querySelector('#bpmn-viewer .loading');
-                if (viewerLoading) {
-                    viewerLoading.style.display = 'flex';
-                    viewerLoading.innerHTML = `❌ Error loading process: ${error.message}`;
-                }
+                console.error('Failed to load process in simulation:', error);
             }
         }
-        // Full screen functionality with better debugging
-        function toggleFullScreen(panelId) {
-            console.log('toggleFullScreen called for:', panelId);
+
+        // Animation functions with color cycling
+        function animateProcess() {
+            if (!viewer || !currentXML || isAnimating) return;
             
-            const panel = document.getElementById(panelId);
-            if (!panel) {
-                console.error('Panel not found:', panelId);
-                return;
-            }
+            animationRunCount++;
+            const currentRun = ((animationRunCount - 1) % 8) + 1;
+            const animationClass = `animation-run-${currentRun}`;
             
-            const isFullScreen = panel.classList.contains('fullscreen');
-            console.log('Current fullscreen state:', isFullScreen);
+            updateAnimationStatus('running', `Running animation - ${animationColors[currentRun - 1].name} (Run #${animationRunCount})`);
+            updateAnimationRunCount();
             
-            if (isFullScreen) {
-                // Exit full screen
-                panel.classList.remove('fullscreen');
+            isAnimating = true;
+            startAnimation(viewer, animationClass);
+        }
+
+        function startSimulation() {
+            if (!simulationViewer || !currentXML || isSimulating) return;
+            
+            simulationRunCount++;
+            const currentRun = ((simulationRunCount - 1) % 8) + 1;
+            const animationClass = `animation-run-${currentRun}`;
+            
+            updateSimulationStatus('running', `Running simulation - ${animationColors[currentRun - 1].name} (Run #${simulationRunCount})`);
+            updateSimulationRunCount();
+            
+            isSimulating = true;
+            startAnimation(simulationViewer, animationClass);
+            
+            // Start performance metrics simulation
+            startMetricsSimulation();
+        }
+
+        function startAnimation(viewerInstance, animationClass) {
+            try {
+                const elementRegistry = viewerInstance.get('elementRegistry');
+                const elements = elementRegistry.getAll();
                 
-                // Remove close button
-                const closeBtn = panel.querySelector('.fullscreen-controls');
-                if (closeBtn) {
-                    closeBtn.remove();
+                const startEvent = elements.find(el => el.type === 'bpmn:StartEvent');
+                if (!startEvent) {
+                    console.log('No start event found');
+                    return;
                 }
                 
-                // Reset body overflow
-                document.body.style.overflow = '';
+                highlightPath(startEvent, elementRegistry, animationClass, viewerInstance, 1500);
                 
-                console.log('✅ Exited full screen for', panelId);
-            } else {
-                // Enter full screen
-                panel.classList.add('fullscreen');
-                
-                // Hide body scrollbar
-                document.body.style.overflow = 'hidden';
-                
-                // Add close button
-                const closeBtn = document.createElement('div');
-                closeBtn.className = 'fullscreen-controls';
-                closeBtn.innerHTML = `
-                    <button class="btn btn-close-fullscreen" onclick="toggleFullScreen('${panelId}')" 
-                            style="background: var(--macta-red) !important; color: white !important; 
-                                   font-size: 18px !important; padding: 10px 15px !important; 
-                                   border-radius: 50% !important; border: none; cursor: pointer;">
-                        ✕
-                    </button>
-                `;
-                panel.appendChild(closeBtn);
-                
-                console.log('✅ Entered full screen for', panelId);
-                
-                // Re-fit canvas after full screen with delay
-                setTimeout(() => {
-                    try {
-                        if (panelId === 'design-panel' && modeler) {
-                            modeler.get('canvas').zoom('fit-viewport');
-                            console.log('Designer canvas refitted for fullscreen');
-                        } else if (panelId === 'view-panel' && viewer) {
-                            viewer.get('canvas').zoom('fit-viewport');
-                            console.log('Viewer canvas refitted for fullscreen');
-                        } else if (panelId === 'simulate-panel' && simulationViewer) {
-                            simulationViewer.get('canvas').zoom('fit-viewport');
-                            console.log('Simulation canvas refitted for fullscreen');
-                        }
-                    } catch (error) {
-                        console.error('Error refitting canvas for fullscreen:', error);
+            } catch (error) {
+                console.error('Animation error:', error);
+                isAnimating = false;
+                isSimulating = false;
+            }
+        }
+
+        async function highlightPath(currentElement, elementRegistry, animationClass, viewerInstance, delay) {
+            if (!currentElement || (!isAnimating && !isSimulating)) return;
+            
+            try {
+                const gfx = elementRegistry.getGraphics(currentElement);
+                if (gfx) {
+                    gfx.classList.add(animationClass);
+                    updateActiveTokens();
+                }
+            } catch (error) {
+                console.log('Element highlighting failed:', error);
+            }
+            
+            const timeout = setTimeout(async () => {
+                const outgoing = currentElement.businessObject?.outgoing;
+                if (outgoing && outgoing.length > 0) {
+                    
+                    let selectedFlows = outgoing;
+                    
+                    if (currentElement.type === 'bpmn:ExclusiveGateway') {
+                        const randomIndex = Math.floor(Math.random() * outgoing.length);
+                        selectedFlows = [outgoing[randomIndex]];
                     }
-                }, 500);
+                    
+                    for (const flow of selectedFlows) {
+                        // Highlight the flow
+                        const flowGfx = elementRegistry.getGraphics(flow);
+                        if (flowGfx) {
+                            flowGfx.classList.add(animationClass);
+                        }
+                        
+                        const nextElement = elementRegistry.get(flow.targetRef?.id);
+                        if (nextElement && (isAnimating || isSimulating)) {
+                            if (nextElement.type !== 'bpmn:EndEvent') {
+                                await highlightPath(nextElement, elementRegistry, animationClass, viewerInstance, delay);
+                            } else {
+                                // Highlight end event
+                                const endGfx = elementRegistry.getGraphics(nextElement);
+                                if (endGfx) {
+                                    endGfx.classList.add(animationClass);
+                                    updateCompletedInstances();
+                                }
+                                
+                                // Animation completed
+                                setTimeout(() => {
+                                    if (viewerInstance === viewer) {
+                                        updateAnimationStatus('completed', `Animation completed - Run #${animationRunCount}`);
+                                        isAnimating = false;
+                                    } else if (viewerInstance === simulationViewer) {
+                                        updateSimulationStatus('completed', `Simulation completed - Run #${simulationRunCount}`);
+                                        isSimulating = false;
+                                    }
+                                }, delay);
+                            }
+                        }
+                    }
+                }
+            }, delay);
+            
+            if (viewerInstance === viewer) {
+                animationTimeouts.push(timeout);
+            } else {
+                simulationTimeouts.push(timeout);
             }
         }
+
+        // Clear functions
+        function clearAnimation() {
+            isAnimating = false;
+            animationTimeouts.forEach(timeout => clearTimeout(timeout));
+            animationTimeouts = [];
+            
+            if (viewer) clearAllHighlights(viewer);
+            updateAnimationStatus('stopped', 'Animation stopped');
+        }
+
+        function clearSimulation() {
+            isSimulating = false;
+            simulationTimeouts.forEach(timeout => clearTimeout(timeout));
+            simulationTimeouts = [];
+            
+            if (simulationInterval) {
+                clearInterval(simulationInterval);
+                simulationInterval = null;
+            }
+            
+            if (simulationViewer) clearAllHighlights(simulationViewer);
+            updateSimulationStatus('stopped', 'Simulation stopped');
+        }
+
+        function resetAllAnimations() {
+            clearAnimation();
+            clearSimulation();
+            
+            // Reset counters
+            animationRunCount = 0;
+            simulationRunCount = 0;
+            updateAnimationRunCount();
+            updateSimulationRunCount();
+            
+            // Reset metrics
+            document.getElementById('total-time').textContent = '--';
+            document.getElementById('active-tokens').textContent = '0';
+            document.getElementById('completed-instances').textContent = '0';
+            document.getElementById('efficiency-score').textContent = '--';
+            
+            updateAnimationStatus('ready', 'Ready to animate');
+            updateSimulationStatus('ready', 'Ready to simulate');
+        }
+
+        function clearAllHighlights(viewerInstance) {
+            try {
+                const elementRegistry = viewerInstance.get('elementRegistry');
+                const elements = elementRegistry.getAll();
+                
+                elements.forEach(element => {
+                    const gfx = elementRegistry.getGraphics(element);
+                    if (gfx) {
+                        for (let i = 1; i <= 8; i++) {
+                            gfx.classList.remove(`animation-run-${i}`);
+                        }
+                    }
+                });
+                
+            } catch (error) {
+                console.error('Failed to clear highlights:', error);
+            }
+        }
+
+        // UI Update functions
+        function updateAnimationStatus(status, text) {
+            const statusElement = document.getElementById('animation-status');
+            const textElement = document.getElementById('animation-text');
+            
+            statusElement.className = `animation-status ${status}`;
+            textElement.textContent = text;
+        }
+
+        function updateSimulationStatus(status, text) {
+            const statusElement = document.getElementById('simulation-status');
+            const textElement = document.getElementById('simulation-text');
+            
+            statusElement.className = `animation-status ${status}`;
+            textElement.textContent = text;
+        }
+
+        function updateAnimationRunCount() {
+            document.getElementById('animation-run-count').textContent = animationRunCount;
+        }
+
+        function updateSimulationRunCount() {
+            document.getElementById('simulation-run-count').textContent = simulationRunCount;
+        }
+
+        function updateActiveTokens() {
+            const activeCount = document.querySelectorAll('[class*="animation-run-"]').length;
+            document.getElementById('active-tokens').textContent = activeCount;
+        }
+
+        function updateCompletedInstances() {
+            const completed = parseInt(document.getElementById('completed-instances').textContent) + 1;
+            document.getElementById('completed-instances').textContent = completed;
+        }
+
+        function updateColorLegends() {
+            // Update view tab legend
+            const viewLegend = document.getElementById('color-legend-items');
+            if (viewLegend) {
+                viewLegend.innerHTML = '';
+                animationColors.forEach((color, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'legend-item';
+                    item.innerHTML = `
+                        <div class="legend-color" style="background-color: ${color.color}"></div>
+                        <span>Run ${index + 1}: ${color.name}</span>
+                    `;
+                    viewLegend.appendChild(item);
+                });
+            }
+            
+            // Update simulation tab legend
+            const simLegend = document.getElementById('simulation-legend-items');
+            if (simLegend) {
+                simLegend.innerHTML = '';
+                animationColors.forEach((color, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'legend-item';
+                    item.innerHTML = `
+                        <div class="legend-color" style="background-color: ${color.color}"></div>
+                        <span>Run ${index + 1}: ${color.name}</span>
+                    `;
+                    simLegend.appendChild(item);
+                });
+            }
+        }
+
+        function startMetricsSimulation() {
+            let totalTime = 0;
+            
+            simulationInterval = setInterval(() => {
+                if (!isSimulating) {
+                    clearInterval(simulationInterval);
+                    return;
+                }
+                
+                totalTime += 1;
+                
+                // Update metrics
+                const minutes = Math.floor(totalTime / 60);
+                const seconds = totalTime % 60;
+                const timeDisplay = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+                
+                document.getElementById('total-time').textContent = timeDisplay;
+                
+                // Calculate efficiency score
+                const completed = parseInt(document.getElementById('completed-instances').textContent);
+                if (totalTime > 0 && completed > 0) {
+                    const efficiency = Math.min(100, Math.round((completed / (totalTime / 30)) * 100));
+                    document.getElementById('efficiency-score').textContent = `${efficiency}%`;
+                }
+                
+            }, 1000);
+        }
+
         function loadProcessTasks() {
             if (!modeler) return;
             
@@ -1680,51 +1490,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 const elementRegistry = modeler.get('elementRegistry');
                 const elements = elementRegistry.getAll();
                 
-                // Filter and sort elements by type
                 const tasks = elements.filter(el => 
                     el.type === 'bpmn:Task' || 
                     el.type === 'bpmn:UserTask' || 
                     el.type === 'bpmn:ServiceTask' ||
                     el.type === 'bpmn:StartEvent' ||
-                    el.type === 'bpmn:EndEvent' ||
-                    el.type === 'bpmn:ExclusiveGateway' ||
-                    el.type === 'bpmn:ParallelGateway'
+                    el.type === 'bpmn:EndEvent'
                 );
                 
-                // Sort by type
-                tasks.sort((a, b) => {
-                    const order = {
-                        'bpmn:StartEvent': 1,
-                        'bpmn:Task': 2,
-                        'bpmn:UserTask': 3,
-                        'bpmn:ServiceTask': 4,
-                        'bpmn:ExclusiveGateway': 5,
-                        'bpmn:ParallelGateway': 6,
-                        'bpmn:EndEvent': 7
-                    };
-                    return (order[a.type] || 999) - (order[b.type] || 999);
-                });
-                
-                // Update task dropdown
                 const taskSelect = document.getElementById('task-name');
-                if (taskSelect && taskSelect.tagName === 'INPUT') {
-                    // Convert input to select
-                    const newSelect = document.createElement('select');
-                    newSelect.id = 'task-name';
-                    newSelect.innerHTML = '<option value="">Select Task...</option>';
-                    
-                    tasks.forEach(task => {
-                        const name = task.businessObject.name || task.id;
-                        const type = task.type.replace('bpmn:', '');
-                        const option = document.createElement('option');
-                        option.value = task.id;
-                        option.textContent = `${name} (${type})`;
-                        newSelect.appendChild(option);
-                    });
-                    
-                    taskSelect.parentNode.replaceChild(newSelect, taskSelect);
-                } else if (taskSelect && taskSelect.tagName === 'SELECT') {
-                    // Update existing select
+                if (taskSelect) {
                     taskSelect.innerHTML = '<option value="">Select Task...</option>';
                     
                     tasks.forEach(task => {
@@ -1737,61 +1512,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     });
                 }
                 
-                console.log(`Loaded ${tasks.length} process elements for assignment`);
-                
             } catch (error) {
                 console.error('Failed to load process tasks:', error);
             }
         }
 
-        // Process selector functionality
-        document.getElementById('process-select').addEventListener('change', async (e) => {
-            const selectedValue = e.target.value;
-            
-            if (selectedValue === 'new') {
-                currentXML = defaultBpmnXml;
-                await modeler.importXML(currentXML);
-                
-                // Fix display after loading
-                const canvas = modeler.get('canvas');
-                canvas.zoom('fit-viewport');
-                setTimeout(() => {
-                    canvas.zoom(canvas.zoom());
-                }, 100);
-                
-            } else if (selectedValue) {
-                // Load selected process from database
-                const selectedOption = e.target.selectedOptions[0];
-                const xmlData = selectedOption.dataset.xml;
-                
-                if (xmlData) {
-                    currentXML = xmlData;
-                    await modeler.importXML(currentXML);
-                    
-                    // Fix display after loading
-                    const canvas = modeler.get('canvas');
-                    canvas.zoom('fit-viewport');
-                    setTimeout(() => {
-                        canvas.zoom(canvas.zoom());
-                    }, 100);
-                    
-                    console.log('Process loaded:', selectedOption.textContent);
-                }
-            }
-        });
-
-        // Button event listeners
+        // Event listeners setup
         document.addEventListener('DOMContentLoaded', () => {
             // Initialize BPMN when page loads
             initializeBpmn();
             
-            // New process button
+            // Process selector
+            document.getElementById('process-select').addEventListener('change', async (e) => {
+                const selectedValue = e.target.value;
+                
+                if (selectedValue === 'new') {
+                    currentXML = defaultBpmnXml;
+                    await modeler.importXML(currentXML);
+                    modeler.get('canvas').zoom('fit-viewport');
+                    
+                } else if (selectedValue) {
+                    const selectedOption = e.target.selectedOptions[0];
+                    const xmlData = selectedOption.dataset.xml;
+                    
+                    if (xmlData) {
+                        currentXML = xmlData;
+                        await modeler.importXML(currentXML);
+                        modeler.get('canvas').zoom('fit-viewport');
+                    }
+                }
+            });
+
+            // Viewer process selector
+            document.getElementById('viewer-process-select').addEventListener('change', async (e) => {
+                const selectedValue = e.target.value;
+                
+                if (selectedValue) {
+                    const selectedOption = e.target.selectedOptions[0];
+                    const xmlData = selectedOption.dataset.xml;
+                    
+                    if (xmlData) {
+                        await loadProcessInViewer(xmlData);
+                        currentXML = xmlData;
+                    }
+                } else {
+                    const viewerLoading = document.querySelector('#bpmn-viewer .loading');
+                    if (viewerLoading) {
+                        viewerLoading.style.display = 'flex';
+                        viewerLoading.innerHTML = '👆 Select a process from the dropdown above to view it here...';
+                    }
+                }
+            });
+
+            // Button event listeners
             document.getElementById('btn-new-process').addEventListener('click', () => {
                 document.getElementById('process-select').value = 'new';
                 document.getElementById('process-select').dispatchEvent(new Event('change'));
             });
 
-            // Save process button
             document.getElementById('btn-save-process').addEventListener('click', async () => {
                 if (!modeler) return;
                 
@@ -1803,7 +1581,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     formData.append('action', 'save_process');
                     formData.append('name', processName);
                     formData.append('xml', xml);
-                    formData.append('project_id', '1'); // Default project
+                    formData.append('project_id', '1');
                     
                     const response = await fetch('', {
                         method: 'POST',
@@ -1813,268 +1591,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     const result = await response.json();
                     
                     if (result.success) {
-                        location.reload(); // Reload to update process list
+                        alert('Process saved successfully! 💾');
+                        location.reload();
+                    } else {
+                        alert('Failed to save: ' + result.message);
                     }
                     
                 } catch (error) {
                     console.error('Save error:', error);
+                    alert('Failed to save process ❌');
                 }
             });
 
-        // Clear designer button
-        document.getElementById('btn-clear-designer').addEventListener('click', async () => {
-            if (!modeler) return;
-            
-            // Remove confirmation dialog - just clear directly
-            try {
-                await modeler.importXML(defaultBpmnXml);
-                modeler.get('canvas').zoom('fit-viewport');
-                currentXML = defaultBpmnXml;
-                
-                // Reset process selector
-                document.getElementById('process-select').value = 'new';
-                
-                console.log('Designer cleared successfully');
-            } catch (error) {
-                console.error('Clear designer error:', error);
-            }
-        });
-            document.getElementById('btn-export-xml').addEventListener('click', async () => {
+            document.getElementById('btn-clear-designer').addEventListener('click', async () => {
                 if (!modeler) return;
                 
                 try {
-                    const { xml } = await modeler.saveXML({ format: true });
-                    currentXML = xml;
-                    await loadProcessInViewer(currentXML);
-                    alert('Process exported to viewer! 📤');
+                    await modeler.importXML(defaultBpmnXml);
+                    modeler.get('canvas').zoom('fit-viewport');
+                    currentXML = defaultBpmnXml;
+                    document.getElementById('process-select').value = 'new';
                 } catch (error) {
-                    console.error('Export error:', error);
-                    alert('Failed to export process ❌');
+                    console.error('Clear error:', error);
                 }
             });
 
-            // Animate process button
-            document.getElementById('btn-animate-path').addEventListener('click', () => {
-                animateProcessPath();
-            });
-
-            // Clear highlights button
-            document.getElementById('btn-clear-highlights').addEventListener('click', () => {
-                clearViewerHighlights();
-            });
-
-            // Analyze bottlenecks button
-            document.getElementById('btn-analyze-bottlenecks').addEventListener('click', () => {
-                analyzeBottlenecks();
-            });
-
-            // Validate process button
             document.getElementById('btn-validate-process').addEventListener('click', async () => {
                 if (!modeler) return;
                 
                 try {
-                    const { xml } = await modeler.saveXML({ format: true });
-                    
-                    // Basic BPMN validation
                     const elementRegistry = modeler.get('elementRegistry');
                     const elements = elementRegistry.getAll();
                     
                     const startEvents = elements.filter(el => el.type === 'bpmn:StartEvent');
                     const endEvents = elements.filter(el => el.type === 'bpmn:EndEvent');
-                    const tasks = elements.filter(el => el.type.includes('Task'));
                     
                     let validationErrors = [];
-                    let unconnectedElements = [];
                     
-                    if (startEvents.length === 0) {
-                        validationErrors.push('❌ Missing Start Event');
-                    }
-                    if (endEvents.length === 0) {
-                        validationErrors.push('❌ Missing End Event');
-                    }
-                    if (startEvents.length > 1) {
-                        validationErrors.push('⚠️ Multiple Start Events found');
-                    }
-                    
-                    // Check for unconnected BPMN flow elements only (exclude labels, lanes, participants, etc.)
-                    const flowElements = elements.filter(el => {
-                        return el.type === 'bpmn:StartEvent' ||
-                               el.type === 'bpmn:EndEvent' ||
-                               el.type === 'bpmn:Task' ||
-                               el.type === 'bpmn:UserTask' ||
-                               el.type === 'bpmn:ServiceTask' ||
-                               el.type === 'bpmn:ScriptTask' ||
-                               el.type === 'bpmn:BusinessRuleTask' ||
-                               el.type === 'bpmn:SendTask' ||
-                               el.type === 'bpmn:ReceiveTask' ||
-                               el.type === 'bpmn:ManualTask' ||
-                               el.type === 'bpmn:ExclusiveGateway' ||
-                               el.type === 'bpmn:ParallelGateway' ||
-                               el.type === 'bpmn:InclusiveGateway' ||
-                               el.type === 'bpmn:EventBasedGateway' ||
-                               el.type === 'bpmn:IntermediateCatchEvent' ||
-                               el.type === 'bpmn:IntermediateThrowEvent' ||
-                               el.type === 'bpmn:SubProcess';
-                    });
-                    
-                    const unconnected = flowElements.filter(el => {
-                        const bo = el.businessObject;
-                        const hasIncoming = bo.incoming && bo.incoming.length > 0;
-                        const hasOutgoing = bo.outgoing && bo.outgoing.length > 0;
-                        
-                        if (el.type === 'bpmn:StartEvent') return !hasOutgoing;
-                        if (el.type === 'bpmn:EndEvent') return !hasIncoming;
-                        return !hasIncoming || !hasOutgoing;
-                    });
-                    
-                    // Clear previous highlights
-                    elements.forEach(element => {
-                        const gfx = modeler.get('elementRegistry').getGraphics(element);
-                        if (gfx) {
-                            gfx.classList.remove('validation-error');
-                        }
-                    });
-                    
-                    // Highlight unconnected elements
-                    unconnected.forEach(element => {
-                        const gfx = modeler.get('elementRegistry').getGraphics(element);
-                        if (gfx) {
-                            gfx.classList.add('validation-error');
-                        }
-                        unconnectedElements.push({
-                            id: element.id,
-                            name: element.businessObject.name || element.id,
-                            type: element.type.replace('bpmn:', '')
-                        });
-                    });
-                    
-                    if (unconnected.length > 0) {
-                        validationErrors.push(`⚠️ ${unconnected.length} unconnected element(s) (highlighted in red)`);
-                    }
+                    if (startEvents.length === 0) validationErrors.push('❌ Missing Start Event');
+                    if (endEvents.length === 0) validationErrors.push('❌ Missing End Event');
+                    if (startEvents.length > 1) validationErrors.push('⚠️ Multiple Start Events found');
                     
                     if (validationErrors.length === 0) {
-                        // Show success feedback
-                        const statusBar = document.querySelector('.status-bar');
-                        statusBar.innerHTML = '<span class="token"></span> ✅ <strong>Process validation passed!</strong> All flow elements are properly connected.';
-                        statusBar.style.borderLeft = '4px solid var(--macta-green)';
-                        statusBar.style.background = '#e8f5e8';
-                        
-                        console.log('✅ Process validation passed');
+                        alert('✅ Process validation passed!\n\n- Has start event\n- Has end event');
                     } else {
-                        // Show detailed validation errors
-                        let detailedErrors = validationErrors.join('<br>');
-                        
-                        if (unconnectedElements.length > 0) {
-                            detailedErrors += '<br><br><strong>Unconnected Flow Elements:</strong><br>';
-                            unconnectedElements.forEach(el => {
-                                detailedErrors += `• <strong>${el.name}</strong> (${el.type})<br>`;
-                            });
-                            detailedErrors += '<br><em>💡 Fix: Connect these elements with sequence flows (arrows)</em>';
-                        }
-                        
-                        const statusBar = document.querySelector('.status-bar');
-                        statusBar.innerHTML = `<span class="token"></span> <strong>Validation Issues Found:</strong><br>${detailedErrors}`;
-                        statusBar.style.borderLeft = '4px solid var(--macta-red)';
-                        statusBar.style.background = '#ffebee';
-                        statusBar.style.maxHeight = 'none';
-                        statusBar.style.padding = '15px';
-                        
-                        console.log('Validation errors:', validationErrors.join('\n'));
-                        console.log('Unconnected flow elements:', unconnectedElements);
+                        alert('❌ Validation failed:\n\n' + validationErrors.join('\n'));
                     }
-                    
-                    // Reset status bar after 10 seconds
-                    setTimeout(() => {
-                        const statusBar = document.querySelector('.status-bar');
-                        statusBar.innerHTML = '<span class="token"></span> Use the toolbar above to create and edit your process models.';
-                        statusBar.style.borderLeft = '4px solid var(--macta-orange)';
-                        statusBar.style.background = '#f8f9fa';
-                        statusBar.style.maxHeight = '';
-                        statusBar.style.padding = '10px 15px';
-                        
-                        // Clear highlights
-                        elements.forEach(element => {
-                            const gfx = modeler.get('elementRegistry').getGraphics(element);
-                            if (gfx) {
-                                gfx.classList.remove('validation-error');
-                            }
-                        });
-                    }, 10000);
                     
                 } catch (error) {
                     console.error('Validation error:', error);
                 }
             });
 
-            // Viewer process selector functionality
-            document.getElementById('viewer-process-select').addEventListener('change', async (e) => {
-                const selectedValue = e.target.value;
-                console.log('Viewer process selector changed:', selectedValue);
-                
-                if (selectedValue) {
-                    // Show loading state
-                    const viewerLoading = document.querySelector('#bpmn-viewer .loading');
-                    if (viewerLoading) {
-                        viewerLoading.style.display = 'flex';
-                        viewerLoading.innerHTML = '🔄 Loading process...';
-                    }
-                    
-                    // Load selected process directly in viewer
-                    const selectedOption = e.target.selectedOptions[0];
-                    const xmlData = selectedOption.dataset.xml;
-                    
-                    if (xmlData) {
-                        await loadProcessInViewerDirectly(xmlData);
-                        console.log('Process loaded in viewer:', selectedOption.textContent);
-                    } else {
-                        console.error('No XML data found for selected process');
-                        if (viewerLoading) {
-                            viewerLoading.innerHTML = '❌ No process data found';
-                        }
-                    }
-                } else {
-                    // Clear viewer
-                    const viewerLoading = document.querySelector('#bpmn-viewer .loading');
-                    if (viewerLoading) {
-                        viewerLoading.style.display = 'flex';
-                        viewerLoading.innerHTML = '👆 Select a process from the dropdown above to view it here...';
-                    }
-                    
-                    // Clear viewer content if it exists
-                    if (viewer) {
-                        try {
-                            viewer.clear();
-                        } catch (e) {
-                            console.warn('Error clearing viewer:', e);
-                        }
-                    }
-                }
-            });
-
-            // Refresh viewer button
-            document.getElementById('btn-refresh-viewer').addEventListener('click', async () => {
-                const selectedValue = document.getElementById('viewer-process-select').value;
-                console.log('Refresh viewer clicked, selected:', selectedValue);
-                
-                if (selectedValue) {
-                    const selectedOption = document.getElementById('viewer-process-select').selectedOptions[0];
-                    const xmlData = selectedOption.dataset.xml;
-                    
-                    if (xmlData) {
-                        const viewerLoading = document.querySelector('#bpmn-viewer .loading');
-                        if (viewerLoading) {
-                            viewerLoading.style.display = 'flex';
-                            viewerLoading.innerHTML = '🔄 Refreshing...';
-                        }
-                        
-                        await loadProcessInViewerDirectly(xmlData);
-                        console.log('Viewer refreshed');
-                    }
-                } else {
-                    console.log('No process selected to refresh');
-                    alert('Please select a process first');
-                }
-            });
             document.getElementById('btn-zoom-in').addEventListener('click', () => {
                 if (modeler) {
                     const canvas = modeler.get('canvas');
@@ -2094,6 +1662,76 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     modeler.get('canvas').zoom('fit-viewport');
                 }
             });
+
+            document.getElementById('btn-export-xml').addEventListener('click', async () => {
+                if (!modeler) return;
+                
+                try {
+                    const { xml } = await modeler.saveXML({ format: true });
+                    currentXML = xml;
+                    await loadProcessInViewer(currentXML);
+                    alert('Process exported to viewer! 📤');
+                } catch (error) {
+                    console.error('Export error:', error);
+                    alert('Failed to export process ❌');
+                }
+            });
+
+            // Animation controls
+            document.getElementById('btn-animate-path').addEventListener('click', () => {
+                animateProcess();
+            });
+
+            document.getElementById('btn-clear-highlights').addEventListener('click', () => {
+                clearAnimation();
+            });
+
+            document.getElementById('btn-analyze-bottlenecks').addEventListener('click', () => {
+                analyzeBottlenecks();
+            });
+
+            document.getElementById('btn-refresh-viewer').addEventListener('click', async () => {
+                const selectedValue = document.getElementById('viewer-process-select').value;
+                if (selectedValue) {
+                    const selectedOption = document.getElementById('viewer-process-select').selectedOptions[0];
+                    const xmlData = selectedOption.dataset.xml;
+                    if (xmlData) {
+                        await loadProcessInViewer(xmlData);
+                    }
+                } else {
+                    alert('Please select a process first');
+                }
+            });
+
+            document.getElementById('btn-viewer-zoom-fit').addEventListener('click', () => {
+                if (viewer) {
+                    viewer.get('canvas').zoom('fit-viewport');
+                }
+            });
+
+            // Simulation controls
+            document.getElementById('btn-start-simulation').addEventListener('click', () => {
+                startSimulation();
+            });
+
+            document.getElementById('btn-pause-simulation').addEventListener('click', () => {
+                clearSimulation();
+            });
+
+            document.getElementById('btn-stop-simulation').addEventListener('click', () => {
+                clearSimulation();
+            });
+
+            document.getElementById('btn-reset-simulation').addEventListener('click', () => {
+                resetAllAnimations();
+            });
+
+            // Speed control
+            document.getElementById('sim-speed').addEventListener('input', (e) => {
+                document.getElementById('speed-display').textContent = e.target.value + 'x';
+            });
+
+            // Assignment controls
             document.getElementById('btn-assign-resource').addEventListener('click', async () => {
                 const taskName = document.getElementById('task-name').value;
                 const assignedUser = document.getElementById('assigned-user').value;
@@ -2121,7 +1759,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     const result = await response.json();
                     
                     if (result.success) {
-                        alert(`✅ Resource assigned successfully!\n\nTask: ${taskName}\nAssigned to: ${assignedUser}\nDuration: ${duration} hours\nRequired Skills: ${skills}`);
+                        alert(`✅ Resource assigned successfully!\n\nTask: ${taskName}\nAssigned to: ${assignedUser}\nDuration: ${duration} hours`);
                         
                         // Clear form
                         document.getElementById('task-name').value = '';
@@ -2137,230 +1775,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     alert('Failed to assign resource ❌');
                 }
             });
-
-            // Simulation controls
-            document.getElementById('btn-start-simulation').addEventListener('click', () => {
-                startSimulation();
-            });
-
-            document.getElementById('btn-pause-simulation').addEventListener('click', () => {
-                pauseSimulation();
-            });
-
-            document.getElementById('btn-stop-simulation').addEventListener('click', () => {
-                stopSimulation();
-            });
         });
 
-        // Animation functions with improved styling
-        function clearViewerHighlights() {
+        // Bottleneck analysis function
+        function analyzeBottlenecks() {
             if (!viewer) return;
             
             try {
                 const elementRegistry = viewer.get('elementRegistry');
-                const elements = elementRegistry.getAll();
-                
-                elements.forEach(element => {
-                    const gfx = viewer.get('elementRegistry').getGraphics(element);
-                    if (gfx) {
-                        gfx.classList.remove('simulation-highlight', 'bottleneck-highlight');
-                    }
-                });
-                
-                console.log('Cleared all highlights');
-            } catch (error) {
-                console.error('Failed to clear highlights:', error);
-            }
-        }
-
-        async function animateProcessPath() {
-            if (!viewer) {
-                return;
-            }
-            
-            clearViewerHighlights();
-            
-            try {
-                const elementRegistry = viewer.get('elementRegistry');
-                const elements = elementRegistry.getAll();
-                
-                // Find start event
-                const startEvent = elements.find(el => el.type === 'bpmn:StartEvent');
-                if (!startEvent) {
-                    return;
-                }
-                
-                console.log('Starting animation from:', startEvent.id);
-                await highlightPath(startEvent, elementRegistry, 1200);
-                
-            } catch (error) {
-                console.error('Animation error:', error);
-            }
-        }
-
-        // Animation functions with proper stopping
-        function clearViewerHighlights() {
-            console.log('Stopping animation and clearing highlights...');
-            
-            // Stop any running animation
-            if (animationInterval) {
-                clearInterval(animationInterval);
-                animationInterval = null;
-            }
-            
-            if (currentAnimationTimeout) {
-                clearTimeout(currentAnimationTimeout);
-                currentAnimationTimeout = null;
-            }
-            
-            if (!viewer) {
-                console.log('No viewer available for clearing highlights');
-                return;
-            }
-            
-            try {
-                const elementRegistry = viewer.get('elementRegistry');
-                const elements = elementRegistry.getAll();
-                
-                elements.forEach(element => {
-                    const gfx = viewer.get('elementRegistry').getGraphics(element);
-                    if (gfx) {
-                        gfx.classList.remove('simulation-highlight', 'bottleneck-highlight');
-                    }
-                });
-                
-                console.log('✅ Animation stopped and all highlights cleared');
-            } catch (error) {
-                console.error('Failed to clear highlights:', error);
-            }
-        }
-
-        async function animateProcessPath() {
-            console.log('Starting process animation...');
-            
-            // Clear any existing animation first
-            clearViewerHighlights();
-            
-            if (!viewer) {
-                console.log('No viewer available for animation');
-                return;
-            }
-            
-            try {
-                const elementRegistry = viewer.get('elementRegistry');
-                const elements = elementRegistry.getAll();
-                
-                // Find start event
-                const startEvent = elements.find(el => el.type === 'bpmn:StartEvent');
-                if (!startEvent) {
-                    console.log('No start event found in the process');
-                    return;
-                }
-                
-                console.log('Starting animation from:', startEvent.id);
-                await highlightPath(startEvent, elementRegistry, 1000);
-                
-            } catch (error) {
-                console.error('Animation error:', error);
-            }
-        }
-
-        async function highlightPath(currentElement, elementRegistry, delay) {
-            if (!currentElement || !viewer) return;
-            
-            console.log('Highlighting element:', currentElement.id, currentElement.type);
-            
-            // Highlight current element
-            try {
-                const gfx = viewer.get('elementRegistry').getGraphics(currentElement);
-                if (gfx) {
-                    gfx.classList.add('simulation-highlight');
-                    
-                    // Update active tokens counter
-                    const activeTokens = document.querySelectorAll('.simulation-highlight').length;
-                    document.getElementById('active-tokens').textContent = activeTokens;
-                }
-            } catch (error) {
-                console.log('Element highlighting failed:', currentElement.id, error);
-            }
-            
-            // Use timeout for delay that can be cancelled
-            currentAnimationTimeout = setTimeout(async () => {
-                // Find next element - improved path selection
-                const outgoing = currentElement.businessObject?.outgoing;
-                if (outgoing && outgoing.length > 0) {
-                    
-                    // For gateways, randomly choose a path to simulate different scenarios
-                    let selectedFlows = outgoing;
-                    if (currentElement.type === 'bpmn:ExclusiveGateway') {
-                        // Randomly select one path for exclusive gateways
-                        const randomIndex = Math.floor(Math.random() * outgoing.length);
-                        selectedFlows = [outgoing[randomIndex]];
-                        console.log(`Gateway decision: taking path ${randomIndex + 1} of ${outgoing.length}`);
-                    }
-                    
-                    for (const flow of selectedFlows) {
-                        const nextElement = elementRegistry.get(flow.targetRef?.id);
-                        
-                        // Highlight the flow
-                        try {
-                            const flowElement = elementRegistry.get(flow.id);
-                            if (flowElement) {
-                                const flowGfx = viewer.get('elementRegistry').getGraphics(flowElement);
-                                if (flowGfx) {
-                                    flowGfx.classList.add('simulation-highlight');
-                                }
-                            }
-                        } catch (error) {
-                            console.log('Flow highlighting failed:', flow.id, error);
-                        }
-                        
-                        currentAnimationTimeout = setTimeout(async () => {
-                            if (nextElement && nextElement.type !== 'bpmn:EndEvent') {
-                                await highlightPath(nextElement, elementRegistry, delay);
-                            } else if (nextElement) {
-                                // Highlight end event
-                                try {
-                                    const gfx = viewer.get('elementRegistry').getGraphics(nextElement);
-                                    if (gfx) {
-                                        gfx.classList.add('simulation-highlight');
-                                        
-                                        // Increment completed instances
-                                        const completed = parseInt(document.getElementById('completed-instances').textContent) + 1;
-                                        document.getElementById('completed-instances').textContent = completed;
-                                        
-                                        console.log('Process instance completed');
-                                    }
-                                } catch (error) {
-                                    console.log('End element highlighting failed:', nextElement.id, error);
-                                }
-                            }
-                        }, delay / 2);
-                        
-                        // Only process first selected flow to avoid infinite loops
-                        break;
-                    }
-                }
-            }, delay);
-        }
-
-        function analyzeBottlenecks() {
-            if (!viewer) {
-                return;
-            }
-            
-            try {
-                const elementRegistry = viewer.get('elementRegistry');
-                const tasks = elementRegistry.filter(el => el.type === 'bpmn:Task' || el.type === 'bpmn:UserTask' || el.type === 'bpmn:ServiceTask');
+                const tasks = elementRegistry.filter(el => 
+                    el.type === 'bpmn:Task' || 
+                    el.type === 'bpmn:UserTask' || 
+                    el.type === 'bpmn:ServiceTask'
+                );
                 
                 if (tasks.length === 0) {
+                    alert('No tasks found in the process');
                     return;
                 }
                 
-                clearViewerHighlights();
+                // Clear previous highlights
+                clearAllHighlights(viewer);
                 
-                // Analyze multiple potential bottlenecks
-                const bottleneckCount = Math.min(3, tasks.length);
+                // Highlight random bottlenecks
+                const bottleneckCount = Math.min(2, tasks.length);
                 const bottlenecks = [];
                 
                 for (let i = 0; i < bottleneckCount; i++) {
@@ -2368,264 +1806,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     if (!bottlenecks.includes(randomTask)) {
                         bottlenecks.push(randomTask);
                         
-                        // Highlight bottleneck
-                        try {
-                            const gfx = viewer.get('elementRegistry').getGraphics(randomTask);
-                            if (gfx) {
-                                gfx.classList.add('bottleneck-highlight');
-                            }
-                        } catch (error) {
-                            console.log('Bottleneck highlighting failed:', randomTask.id, error);
+                        const gfx = elementRegistry.getGraphics(randomTask);
+                        if (gfx) {
+                            gfx.style.fill = '#ffebee';
+                            gfx.style.stroke = '#f44336';
+                            gfx.style.strokeWidth = '4px';
                         }
                     }
                 }
                 
-                const bottleneckNames = bottlenecks.map(task => task.businessObject.name || task.id).join('\n• ');
+                const bottleneckNames = bottlenecks.map(task => 
+                    task.businessObject.name || task.id
+                ).join('\n• ');
                 
-                console.log(`⚠️ Potential Bottlenecks Detected:\n\n• ${bottleneckNames}\n\nRecommendations:\n• Review resource allocation\n• Consider parallel processing\n• Implement automation\n• Optimize task duration\n• Add additional resources`);
+                alert(`⚠️ Potential Bottlenecks Detected:\n\n• ${bottleneckNames}\n\nRecommendations:\n• Review resource allocation\n• Consider parallel processing\n• Implement automation\n• Optimize task duration`);
                 
             } catch (error) {
                 console.error('Bottleneck analysis error:', error);
             }
         }
 
-        // Enhanced simulation functions
-        function startSimulation() {
-            if (simulationActive) return;
-            
-            // Load current process into simulation viewer
-            if (simulationViewer && currentXML) {
-                simulationViewer.importXML(currentXML).then(() => {
-                    simulationViewer.get('canvas').zoom('fit-viewport');
-                    document.querySelector('#simulation-viewer .loading').style.display = 'none';
-                }).catch(err => {
-                    console.error('Failed to load process in simulation viewer:', err);
-                });
-            }
-            
-            simulationActive = true;
-            document.getElementById('btn-start-simulation').textContent = '▶️ Running...';
-            document.getElementById('btn-start-simulation').disabled = true;
-            
-            // Initialize metrics
-            let totalTime = 0;
-            let activeTokens = 0;
-            let completedInstances = 0;
-            
-            console.log('Starting enhanced simulation...');
-            
-            // Update metrics every second
-            simulationInterval = setInterval(() => {
-                totalTime += 1;
-                
-                // Simulate token flow
-                if (Math.random() > 0.6) {
-                    activeTokens = Math.max(0, activeTokens + 1);
-                }
-                
-                if (Math.random() > 0.8 && activeTokens > 0) {
-                    completedInstances++;
-                    activeTokens = Math.max(0, activeTokens - 1);
-                }
-                
-                updateSimulationMetrics(totalTime, activeTokens, completedInstances);
-            }, 1000);
-            
-            // Auto-animate process during simulation using simulation viewer
-            let animationStep = 0;
-            const animationInterval = setInterval(() => {
-                if (simulationActive && simulationViewer) {
-                    // Clear previous highlights periodically
-                    if (animationStep % 4 === 0) {
-                        clearSimulationHighlights();
-                    }
-                    
-                    // Start new animation sequence
-                    setTimeout(() => {
-                        if (simulationActive) {
-                            animateSimulationPath();
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case 's':
+                        e.preventDefault();
+                        document.getElementById('btn-save-process').click();
+                        break;
+                    case ' ':
+                        e.preventDefault();
+                        if (document.querySelector('[data-tab="view"]').classList.contains('active')) {
+                            animateProcess();
+                        } else if (document.querySelector('[data-tab="simulate"]').classList.contains('active')) {
+                            startSimulation();
                         }
-                    }, 500);
-                    
-                    animationStep++;
-                } else {
-                    clearInterval(animationInterval);
-                }
-            }, 3500);
-            
-            // Simulate process performance analysis
-            setTimeout(() => {
-                if (simulationActive) {
-                    console.log('Running performance analysis...');
-                    simulatePerformanceData();
-                }
-            }, 5000);
-        }
-
-        // Animation functions for simulation viewer
-        function clearSimulationHighlights() {
-            if (!simulationViewer) return;
-            
-            try {
-                const elementRegistry = simulationViewer.get('elementRegistry');
-                const elements = elementRegistry.getAll();
-                
-                elements.forEach(element => {
-                    const gfx = simulationViewer.get('elementRegistry').getGraphics(element);
-                    if (gfx) {
-                        gfx.classList.remove('simulation-highlight', 'bottleneck-highlight');
-                    }
-                });
-                
-                console.log('Cleared simulation highlights');
-            } catch (error) {
-                console.error('Failed to clear simulation highlights:', error);
-            }
-        }
-
-        async function animateSimulationPath() {
-            if (!simulationViewer) return;
-            
-            try {
-                const elementRegistry = simulationViewer.get('elementRegistry');
-                const elements = elementRegistry.getAll();
-                
-                // Find start event
-                const startEvent = elements.find(el => el.type === 'bpmn:StartEvent');
-                if (!startEvent) {
-                    console.log('No start event found for simulation');
-                    return;
-                }
-                
-                await highlightSimulationPath(startEvent, elementRegistry, 1000);
-                
-            } catch (error) {
-                console.error('Simulation animation error:', error);
-            }
-        }
-
-        async function highlightSimulationPath(currentElement, elementRegistry, delay) {
-            if (!currentElement || !simulationViewer) return;
-            
-            // Highlight current element
-            try {
-                const gfx = simulationViewer.get('elementRegistry').getGraphics(currentElement);
-                if (gfx) {
-                    gfx.classList.add('simulation-highlight');
-                }
-            } catch (error) {
-                console.log('Simulation element highlighting failed:', currentElement.id, error);
-            }
-            
-            await new Promise(resolve => setTimeout(resolve, delay));
-            
-            // Continue path logic similar to main animation but for simulation viewer
-            const outgoing = currentElement.businessObject?.outgoing;
-            if (outgoing && outgoing.length > 0) {
-                let selectedFlows = outgoing;
-                if (currentElement.type === 'bpmn:ExclusiveGateway') {
-                    const randomIndex = Math.floor(Math.random() * outgoing.length);
-                    selectedFlows = [outgoing[randomIndex]];
-                }
-                
-                for (const flow of selectedFlows) {
-                    const nextElement = elementRegistry.get(flow.targetRef?.id);
-                    
-                    if (nextElement && nextElement.type !== 'bpmn:EndEvent') {
-                        await highlightSimulationPath(nextElement, elementRegistry, delay);
-                    } else if (nextElement) {
-                        // Highlight end event
-                        try {
-                            const gfx = simulationViewer.get('elementRegistry').getGraphics(nextElement);
-                            if (gfx) {
-                                gfx.classList.add('simulation-highlight');
-                            }
-                        } catch (error) {
-                            console.log('Simulation end element highlighting failed:', nextElement.id, error);
-                        }
-                    }
-                    break;
+                        break;
                 }
             }
-        }
-
-        function simulatePerformanceData() {
-            // Simulate realistic process metrics
-            const processes = [
-                'Customer Inquiry Processing',
-                'Document Verification',
-                'Approval Workflow',
-                'Payment Processing',
-                'Order Fulfillment'
-            ];
             
-            const randomProcess = processes[Math.floor(Math.random() * processes.length)];
-            const avgTime = Math.floor(Math.random() * 300) + 60; // 60-360 seconds
-            const efficiency = Math.floor(Math.random() * 40) + 60; // 60-100%
-            
-            console.log(`Performance Analysis: ${randomProcess} - Avg Time: ${avgTime}s, Efficiency: ${efficiency}%`);
-            
-            // Update efficiency score
-            document.getElementById('efficiency-score').textContent = `${efficiency}%`;
-        }
-
-        function pauseSimulation() {
-            if (simulationInterval) {
-                clearInterval(simulationInterval);
-                simulationInterval = null;
-            }
-            simulationActive = false;
-            document.getElementById('btn-start-simulation').textContent = '▶️ Resume';
-            document.getElementById('btn-start-simulation').disabled = false;
-            
-            console.log('Simulation paused');
-        }
-
-        function stopSimulation() {
-            if (simulationInterval) {
-                clearInterval(simulationInterval);
-                simulationInterval = null;
-            }
-            simulationActive = false;
-            document.getElementById('btn-start-simulation').textContent = '▶️ Start Simulation';
-            document.getElementById('btn-start-simulation').disabled = false;
-            
-            // Reset metrics
-            updateSimulationMetrics(0, 0, 0);
-            clearSimulationHighlights();
-            
-            console.log('Simulation stopped and reset');
-        }
-
-        function updateSimulationMetrics(totalTime, activeTokens, completedInstances) {
-            // Format time display
-            const minutes = Math.floor(totalTime / 60);
-            const seconds = totalTime % 60;
-            const timeDisplay = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
-            
-            document.getElementById('total-time').textContent = timeDisplay;
-            document.getElementById('active-tokens').textContent = activeTokens;
-            document.getElementById('completed-instances').textContent = completedInstances;
-            
-            // Calculate dynamic efficiency score
-            if (totalTime > 0 && completedInstances > 0) {
-                const efficiency = Math.min(100, Math.round((completedInstances / (totalTime / 30)) * 100));
-                document.getElementById('efficiency-score').textContent = `${efficiency}%`;
-            }
-            
-            // Update metric card colors based on performance
-            const efficiencyCard = document.querySelector('.metric-card:last-child');
-            if (efficiencyCard) {
-                const efficiencyValue = parseInt(document.getElementById('efficiency-score').textContent);
-                if (efficiencyValue >= 80) {
-                    efficiencyCard.style.background = 'linear-gradient(135deg, var(--macta-green), var(--macta-teal))';
-                } else if (efficiencyValue >= 60) {
-                    efficiencyCard.style.background = 'linear-gradient(135deg, var(--macta-yellow), var(--macta-orange))';
-                } else {
-                    efficiencyCard.style.background = 'linear-gradient(135deg, var(--macta-red), var(--macta-orange))';
+            // Tab switching with numbers
+            if (e.key >= '1' && e.key <= '4') {
+                const tabs = ['design', 'view', 'assign', 'simulate'];
+                const tabIndex = parseInt(e.key) - 1;
+                if (tabs[tabIndex]) {
+                    switchTab(tabs[tabIndex]);
                 }
             }
-        }
+        });
+
+        console.log('🚀 Enhanced MACTA Process Manager with Tabs and Color Cycling initialized');
     </script>
 </body>
 </html>
