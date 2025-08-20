@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3306
--- Generation Time: Aug 19, 2025 at 12:32 AM
+-- Generation Time: Aug 20, 2025 at 02:45 PM
 -- Server version: 8.0.30
 -- PHP Version: 8.1.10
 
@@ -54,6 +54,41 @@ CREATE TABLE `customer_feedback` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `dashboard_metrics_cache`
+--
+
+CREATE TABLE `dashboard_metrics_cache` (
+  `id` int NOT NULL,
+  `metric_name` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `metric_value` decimal(15,2) NOT NULL,
+  `process_id` int DEFAULT NULL,
+  `last_updated` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `enhanced_resources`
+--
+
+CREATE TABLE `enhanced_resources` (
+  `id` int NOT NULL,
+  `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `type` enum('human','machine','hybrid','software') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'human',
+  `hourly_cost` decimal(10,2) DEFAULT '0.00',
+  `skill_level` enum('entry','intermediate','advanced','expert') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT 'intermediate',
+  `availability` decimal(5,2) DEFAULT '100.00' COMMENT 'Percentage availability',
+  `efficiency_factor` decimal(3,2) DEFAULT '1.00' COMMENT 'Efficiency multiplier',
+  `max_concurrent_tasks` int DEFAULT '1',
+  `department` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `location` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `job_descriptions`
 --
 
@@ -88,6 +123,49 @@ CREATE TABLE `metrics` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `optimization_recommendations`
+--
+
+CREATE TABLE `optimization_recommendations` (
+  `id` int NOT NULL,
+  `process_id` int NOT NULL,
+  `recommendation_type` enum('automation','parallel_processing','skill_routing','resource_reallocation','process_redesign') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `title` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `expected_impact` json NOT NULL COMMENT 'Expected improvements in time, cost, quality',
+  `implementation_effort` enum('low','medium','high') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `investment_required` decimal(10,2) DEFAULT '0.00',
+  `payback_period_months` int DEFAULT NULL,
+  `priority_score` int DEFAULT '0' COMMENT 'Priority score 0-100',
+  `status` enum('suggested','approved','in_progress','completed','rejected') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT 'suggested',
+  `generated_date` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `process_arrival_configs`
+--
+
+CREATE TABLE `process_arrival_configs` (
+  `id` int NOT NULL,
+  `process_id` int NOT NULL,
+  `arrival_rate_per_hour` decimal(6,2) NOT NULL,
+  `arrival_pattern` enum('regular','random','burst','scheduled') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT 'regular',
+  `process_type` enum('standard','priority','batch','adhoc') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT 'standard',
+  `complexity_distribution` json DEFAULT NULL COMMENT 'Distribution of complexity levels',
+  `seasonal_factors` json DEFAULT NULL COMMENT 'Seasonal arrival rate adjustments',
+  `active_hours_start` time DEFAULT '09:00:00',
+  `active_hours_end` time DEFAULT '17:00:00',
+  `weekend_factor` decimal(3,2) DEFAULT '0.20' COMMENT 'Weekend activity factor',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `process_models`
 --
 
@@ -99,6 +177,26 @@ CREATE TABLE `process_models` (
   `model_data` longtext COLLATE utf8mb4_general_ci,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `process_path_analysis`
+--
+
+CREATE TABLE `process_path_analysis` (
+  `id` int NOT NULL,
+  `process_id` int NOT NULL,
+  `analysis_type` enum('critical','time_consuming','resource_intensive','costly','ideal','frequent') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `path_data` json NOT NULL COMMENT 'Stores path steps and metrics',
+  `total_duration` int NOT NULL COMMENT 'Total duration in minutes',
+  `total_cost` decimal(10,2) NOT NULL,
+  `total_resources` int NOT NULL,
+  `frequency_percentage` decimal(5,2) DEFAULT NULL COMMENT 'How often this path is taken',
+  `bottleneck_tasks` json DEFAULT NULL COMMENT 'Array of bottleneck task IDs',
+  `optimization_suggestions` json DEFAULT NULL,
+  `analysis_date` timestamp NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -149,6 +247,27 @@ CREATE TABLE `resources` (
   `contact_info` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `resource_templates`
+--
+
+CREATE TABLE `resource_templates` (
+  `id` int NOT NULL,
+  `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci,
+  `resource_type` enum('human','machine','hybrid','software') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `default_duration` int NOT NULL COMMENT 'Default duration in minutes',
+  `default_cost` decimal(10,2) NOT NULL,
+  `default_skill_level` enum('entry','intermediate','advanced','expert') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `default_complexity` enum('simple','moderate','complex','critical') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `is_public` tinyint(1) DEFAULT '1',
+  `industry` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `created_by` int DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -236,6 +355,27 @@ CREATE TABLE `simulation_templates` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `task_resource_assignments`
+--
+
+CREATE TABLE `task_resource_assignments` (
+  `id` int NOT NULL,
+  `process_id` int NOT NULL,
+  `task_id` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `resource_id` int NOT NULL,
+  `quantity_required` decimal(8,2) DEFAULT '1.00',
+  `duration_minutes` int NOT NULL,
+  `complexity_level` enum('simple','moderate','complex','critical') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT 'moderate',
+  `priority_level` enum('low','normal','high','urgent') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT 'normal',
+  `setup_time` int DEFAULT '0' COMMENT 'Setup time in minutes',
+  `cleanup_time` int DEFAULT '0' COMMENT 'Cleanup time in minutes',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `training_programs`
 --
 
@@ -285,6 +425,22 @@ ALTER TABLE `customer_feedback`
   ADD KEY `project_id` (`project_id`);
 
 --
+-- Indexes for table `dashboard_metrics_cache`
+--
+ALTER TABLE `dashboard_metrics_cache`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_metric_process` (`metric_name`,`process_id`);
+
+--
+-- Indexes for table `enhanced_resources`
+--
+ALTER TABLE `enhanced_resources`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_type_skill` (`type`,`skill_level`),
+  ADD KEY `idx_department` (`department`),
+  ADD KEY `idx_enhanced_resources_type_skill` (`type`,`skill_level`);
+
+--
 -- Indexes for table `job_descriptions`
 --
 ALTER TABLE `job_descriptions`
@@ -299,12 +455,36 @@ ALTER TABLE `metrics`
   ADD KEY `project_id` (`project_id`);
 
 --
+-- Indexes for table `optimization_recommendations`
+--
+ALTER TABLE `optimization_recommendations`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_process_priority` (`process_id`,`priority_score`),
+  ADD KEY `idx_status` (`status`);
+
+--
+-- Indexes for table `process_arrival_configs`
+--
+ALTER TABLE `process_arrival_configs`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_process` (`process_id`);
+
+--
 -- Indexes for table `process_models`
 --
 ALTER TABLE `process_models`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_project_id` (`project_id`),
   ADD KEY `idx_created_at` (`created_at`);
+
+--
+-- Indexes for table `process_path_analysis`
+--
+ALTER TABLE `process_path_analysis`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_process_type` (`process_id`,`analysis_type`),
+  ADD KEY `idx_analysis_date` (`analysis_date`),
+  ADD KEY `idx_path_analysis_type` (`analysis_type`);
 
 --
 -- Indexes for table `process_step_resources`
@@ -330,6 +510,14 @@ ALTER TABLE `resources`
   ADD KEY `idx_type` (`type`),
   ADD KEY `idx_status` (`availability_status`),
   ADD KEY `idx_name` (`name`);
+
+--
+-- Indexes for table `resource_templates`
+--
+ALTER TABLE `resource_templates`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_name` (`name`),
+  ADD KEY `idx_industry` (`industry`);
 
 --
 -- Indexes for table `simulation_configs`
@@ -371,6 +559,16 @@ ALTER TABLE `simulation_templates`
   ADD KEY `idx_templates_industry_public` (`industry`,`is_public`);
 
 --
+-- Indexes for table `task_resource_assignments`
+--
+ALTER TABLE `task_resource_assignments`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_process_task` (`process_id`,`task_id`),
+  ADD KEY `idx_resource` (`resource_id`),
+  ADD KEY `idx_task_resource_process` (`process_id`),
+  ADD KEY `idx_task_resource_complexity` (`complexity_level`);
+
+--
 -- Indexes for table `training_programs`
 --
 ALTER TABLE `training_programs`
@@ -402,6 +600,18 @@ ALTER TABLE `customer_feedback`
   MODIFY `id` int NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `dashboard_metrics_cache`
+--
+ALTER TABLE `dashboard_metrics_cache`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `enhanced_resources`
+--
+ALTER TABLE `enhanced_resources`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `job_descriptions`
 --
 ALTER TABLE `job_descriptions`
@@ -414,9 +624,27 @@ ALTER TABLE `metrics`
   MODIFY `id` int NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `optimization_recommendations`
+--
+ALTER TABLE `optimization_recommendations`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `process_arrival_configs`
+--
+ALTER TABLE `process_arrival_configs`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `process_models`
 --
 ALTER TABLE `process_models`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `process_path_analysis`
+--
+ALTER TABLE `process_path_analysis`
   MODIFY `id` int NOT NULL AUTO_INCREMENT;
 
 --
@@ -435,6 +663,12 @@ ALTER TABLE `projects`
 -- AUTO_INCREMENT for table `resources`
 --
 ALTER TABLE `resources`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `resource_templates`
+--
+ALTER TABLE `resource_templates`
   MODIFY `id` int NOT NULL AUTO_INCREMENT;
 
 --
@@ -465,6 +699,12 @@ ALTER TABLE `simulation_results`
 -- AUTO_INCREMENT for table `simulation_templates`
 --
 ALTER TABLE `simulation_templates`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `task_resource_assignments`
+--
+ALTER TABLE `task_resource_assignments`
   MODIFY `id` int NOT NULL AUTO_INCREMENT;
 
 --
@@ -550,6 +790,12 @@ ALTER TABLE `simulation_results`
 --
 ALTER TABLE `simulation_templates`
   ADD CONSTRAINT `simulation_templates_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `task_resource_assignments`
+--
+ALTER TABLE `task_resource_assignments`
+  ADD CONSTRAINT `task_resource_assignments_ibfk_1` FOREIGN KEY (`resource_id`) REFERENCES `enhanced_resources` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `training_programs`
