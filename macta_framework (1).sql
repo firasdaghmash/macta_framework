@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3306
--- Generation Time: Aug 20, 2025 at 02:45 PM
+-- Generation Time: Aug 22, 2025 at 01:59 PM
 -- Server version: 8.0.30
 -- PHP Version: 8.1.10
 
@@ -217,6 +217,24 @@ CREATE TABLE `process_step_resources` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `process_tasks`
+--
+
+CREATE TABLE `process_tasks` (
+  `id` int NOT NULL,
+  `process_id` int NOT NULL,
+  `task_name` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
+  `task_id` varchar(50) COLLATE utf8mb4_general_ci NOT NULL,
+  `position_x` float DEFAULT NULL,
+  `position_y` float DEFAULT NULL,
+  `task_type` varchar(50) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `description` text COLLATE utf8mb4_general_ci,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `projects`
 --
 
@@ -245,6 +263,26 @@ CREATE TABLE `resources` (
   `availability_status` enum('available','unavailable','maintenance','reserved') COLLATE utf8mb4_general_ci DEFAULT 'available',
   `specifications` text COLLATE utf8mb4_general_ci,
   `contact_info` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `resource_allocations`
+--
+
+CREATE TABLE `resource_allocations` (
+  `id` int NOT NULL,
+  `process_id` int NOT NULL,
+  `task_id` varchar(50) COLLATE utf8mb4_general_ci NOT NULL,
+  `allocation_name` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `resource_type` enum('human','machine','both') COLLATE utf8mb4_general_ci DEFAULT 'human',
+  `cost` decimal(10,2) DEFAULT '0.00',
+  `processing_time` int DEFAULT '0' COMMENT 'in minutes',
+  `notes` text COLLATE utf8mb4_general_ci,
+  `created_by` int DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -376,6 +414,44 @@ CREATE TABLE `task_resource_assignments` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `timer_averages`
+--
+
+CREATE TABLE `timer_averages` (
+  `id` int NOT NULL,
+  `process_id` int NOT NULL,
+  `task_id` varchar(50) COLLATE utf8mb4_general_ci NOT NULL,
+  `average_duration` int NOT NULL COMMENT 'in seconds',
+  `session_count` int DEFAULT '1',
+  `last_calculated` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `is_overridden` tinyint(1) DEFAULT '0',
+  `override_value` int DEFAULT NULL COMMENT 'manual override in seconds'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `timer_sessions`
+--
+
+CREATE TABLE `timer_sessions` (
+  `id` int NOT NULL,
+  `user_id` int NOT NULL,
+  `process_id` int NOT NULL,
+  `task_id` varchar(50) COLLATE utf8mb4_general_ci NOT NULL,
+  `start_time` timestamp NOT NULL,
+  `end_time` timestamp NULL DEFAULT NULL,
+  `pause_duration` int DEFAULT '0' COMMENT 'total pause time in seconds',
+  `total_duration` int DEFAULT '0' COMMENT 'total working time in seconds',
+  `status` enum('active','paused','completed') COLLATE utf8mb4_general_ci DEFAULT 'active',
+  `notes` text COLLATE utf8mb4_general_ci,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `training_programs`
 --
 
@@ -475,7 +551,8 @@ ALTER TABLE `process_arrival_configs`
 ALTER TABLE `process_models`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_project_id` (`project_id`),
-  ADD KEY `idx_created_at` (`created_at`);
+  ADD KEY `idx_created_at` (`created_at`),
+  ADD KEY `idx_name` (`name`);
 
 --
 -- Indexes for table `process_path_analysis`
@@ -496,6 +573,14 @@ ALTER TABLE `process_step_resources`
   ADD KEY `idx_step_resources_process` (`process_id`);
 
 --
+-- Indexes for table `process_tasks`
+--
+ALTER TABLE `process_tasks`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_task_per_process` (`process_id`,`task_id`),
+  ADD KEY `idx_task_type` (`task_type`);
+
+--
 -- Indexes for table `projects`
 --
 ALTER TABLE `projects`
@@ -510,6 +595,15 @@ ALTER TABLE `resources`
   ADD KEY `idx_type` (`type`),
   ADD KEY `idx_status` (`availability_status`),
   ADD KEY `idx_name` (`name`);
+
+--
+-- Indexes for table `resource_allocations`
+--
+ALTER TABLE `resource_allocations`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_process_task` (`process_id`,`task_id`),
+  ADD KEY `idx_resource_type` (`resource_type`),
+  ADD KEY `created_by` (`created_by`);
 
 --
 -- Indexes for table `resource_templates`
@@ -569,6 +663,23 @@ ALTER TABLE `task_resource_assignments`
   ADD KEY `idx_task_resource_complexity` (`complexity_level`);
 
 --
+-- Indexes for table `timer_averages`
+--
+ALTER TABLE `timer_averages`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_average_per_task` (`process_id`,`task_id`),
+  ADD KEY `idx_last_calculated` (`last_calculated`);
+
+--
+-- Indexes for table `timer_sessions`
+--
+ALTER TABLE `timer_sessions`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_user_status` (`user_id`,`status`),
+  ADD KEY `idx_process_task` (`process_id`,`task_id`),
+  ADD KEY `idx_start_time` (`start_time`);
+
+--
 -- Indexes for table `training_programs`
 --
 ALTER TABLE `training_programs`
@@ -581,7 +692,8 @@ ALTER TABLE `training_programs`
 ALTER TABLE `users`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `username` (`username`),
-  ADD UNIQUE KEY `email` (`email`);
+  ADD UNIQUE KEY `email` (`email`),
+  ADD KEY `idx_role` (`role`);
 
 --
 -- AUTO_INCREMENT for dumped tables
@@ -654,6 +766,12 @@ ALTER TABLE `process_step_resources`
   MODIFY `id` int NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `process_tasks`
+--
+ALTER TABLE `process_tasks`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `projects`
 --
 ALTER TABLE `projects`
@@ -663,6 +781,12 @@ ALTER TABLE `projects`
 -- AUTO_INCREMENT for table `resources`
 --
 ALTER TABLE `resources`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `resource_allocations`
+--
+ALTER TABLE `resource_allocations`
   MODIFY `id` int NOT NULL AUTO_INCREMENT;
 
 --
@@ -705,6 +829,18 @@ ALTER TABLE `simulation_templates`
 -- AUTO_INCREMENT for table `task_resource_assignments`
 --
 ALTER TABLE `task_resource_assignments`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `timer_averages`
+--
+ALTER TABLE `timer_averages`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `timer_sessions`
+--
+ALTER TABLE `timer_sessions`
   MODIFY `id` int NOT NULL AUTO_INCREMENT;
 
 --
@@ -761,10 +897,23 @@ ALTER TABLE `process_step_resources`
   ADD CONSTRAINT `process_step_resources_ibfk_2` FOREIGN KEY (`resource_id`) REFERENCES `simulation_resources` (`id`) ON DELETE CASCADE;
 
 --
+-- Constraints for table `process_tasks`
+--
+ALTER TABLE `process_tasks`
+  ADD CONSTRAINT `process_tasks_ibfk_1` FOREIGN KEY (`process_id`) REFERENCES `process_models` (`id`) ON DELETE CASCADE;
+
+--
 -- Constraints for table `projects`
 --
 ALTER TABLE `projects`
   ADD CONSTRAINT `projects_ibfk_1` FOREIGN KEY (`client_id`) REFERENCES `users` (`id`);
+
+--
+-- Constraints for table `resource_allocations`
+--
+ALTER TABLE `resource_allocations`
+  ADD CONSTRAINT `resource_allocations_ibfk_1` FOREIGN KEY (`process_id`) REFERENCES `process_models` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `resource_allocations_ibfk_2` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `simulation_configs`
@@ -795,7 +944,21 @@ ALTER TABLE `simulation_templates`
 -- Constraints for table `task_resource_assignments`
 --
 ALTER TABLE `task_resource_assignments`
-  ADD CONSTRAINT `task_resource_assignments_ibfk_1` FOREIGN KEY (`resource_id`) REFERENCES `enhanced_resources` (`id`) ON DELETE CASCADE;
+  ADD CONSTRAINT `task_resource_assignments_ibfk_1` FOREIGN KEY (`resource_id`) REFERENCES `enhanced_resources` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `task_resource_assignments_ibfk_2` FOREIGN KEY (`process_id`) REFERENCES `process_models` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `timer_averages`
+--
+ALTER TABLE `timer_averages`
+  ADD CONSTRAINT `timer_averages_ibfk_1` FOREIGN KEY (`process_id`) REFERENCES `process_models` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `timer_sessions`
+--
+ALTER TABLE `timer_sessions`
+  ADD CONSTRAINT `timer_sessions_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `timer_sessions_ibfk_2` FOREIGN KEY (`process_id`) REFERENCES `process_models` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `training_programs`
