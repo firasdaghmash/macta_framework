@@ -1,890 +1,842 @@
 <?php
-// modules/M/simulation.php - Process Simulation Engine
-session_start();
-
-// Check if config exists
-if (!file_exists('../../config/config.php')) {
-    header('Location: ../../install.php');
-    exit;
-}
-
-require_once '../../config/config.php';
-require_once '../../config/database.php';
-require_once '../../shared/functions.php';
-
-$db = new Database();
-$conn = $db->getConnection();
-
-// Handle AJAX requests
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    header('Content-Type: application/json');
-    
-    try {
-        switch ($_POST['action']) {
-            case 'load_process_for_simulation':
-                $processId = $_POST['process_id'];
-                $stmt = $conn->prepare("SELECT * FROM process_models WHERE id = ?");
-                $stmt->execute([$processId]);
-                $process = $stmt->fetch(PDO::FETCH_ASSOC);
-                
-                if ($process) {
-                    // Parse BPMN to extract elements
-                    $elements = extractBPMNElements($process['model_data']);
-                    echo json_encode(['success' => true, 'process' => $process, 'elements' => $elements]);
-                } else {
-                    throw new Exception('Process not found');
-                }
-                break;
-                
-            case 'save_simulation_config':
-                $processId = $_POST['process_id'];
-                $config = $_POST['config'];
-                
-                // Save or update simulation configuration
-                $stmt = $conn->prepare("
-                    INSERT INTO simulation_configs (process_id, config_data, created_at, updated_at) 
-                    VALUES (?, ?, NOW(), NOW())
-                    ON DUPLICATE KEY UPDATE config_data = ?, updated_at = NOW()
-                ");
-                $stmt->execute([$processId, $config, $config]);
-                
-                echo json_encode(['success' => true, 'message' => 'Simulation configuration saved']);
-                break;
-                
-            case 'run_simulation':
-                $processId = $_POST['process_id'];
-                $scenarios = json_decode($_POST['scenarios'], true);
-                
-                // Run simulation with different scenarios
-                $results = runProcessSimulation($conn, $processId, $scenarios);
-                
-                // Save simulation results
-                $stmt = $conn->prepare("
-                    INSERT INTO simulation_results 
-                    (process_id, scenario_data, results_data, created_at) 
-                    VALUES (?, ?, ?, NOW())
-                ");
-                $stmt->execute([
-                    $processId, 
-                    $_POST['scenarios'], 
-                    json_encode($results)
-                ]);
-                
-                echo json_encode(['success' => true, 'results' => $results]);
-                break;
-        }
-    } catch (Exception $e) {
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-    }
-    exit;
-}
-
-// Get available processes for simulation
-$stmt = $conn->prepare("
-    SELECT pm.*, p.name as project_name 
-    FROM process_models pm
-    LEFT JOIN projects p ON pm.project_id = p.id
-    ORDER BY pm.updated_at DESC
-");
-$stmt->execute();
-$processes = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Function to extract BPMN elements
-function extractBPMNElements($bpmnXml) {
-    $elements = [];
-    
-    // Simple XML parsing to extract process elements
-    try {
-        $xml = new SimpleXMLElement($bpmnXml);
-        $xml->registerXPathNamespace('bpmn2', 'http://www.omg.org/spec/BPMN/20100524/MODEL');
-        
-        // Extract different types of elements
-        $tasks = $xml->xpath('//bpmn2:task | //bpmn2:userTask | //bpmn2:serviceTask | //bpmn2:manualTask');
-        $gateways = $xml->xpath('//bpmn2:exclusiveGateway | //bpmn2:parallelGateway | //bpmn2:inclusiveGateway');
-        $events = $xml->xpath('//bpmn2:startEvent | //bpmn2:endEvent | //bpmn2:intermediateThrowEvent | //bpmn2:intermediateCatchEvent');
-        
-        foreach ($tasks as $task) {
-            $elements[] = [
-                'id' => (string)$task['id'],
-                'name' => (string)$task['name'] ?: 'Unnamed Task',
-                'type' => 'task',
-                'elementType' => $task->getName()
-            ];
-        }
-        
-        foreach ($gateways as $gateway) {
-            $elements[] = [
-                'id' => (string)$gateway['id'],
-                'name' => (string)$gateway['name'] ?: 'Gateway',
-                'type' => 'gateway',
-                'elementType' => $gateway->getName()
-            ];
-        }
-        
-        foreach ($events as $event) {
-            $elements[] = [
-                'id' => (string)$event['id'],
-                'name' => (string)$event['name'] ?: 'Event',
-                'type' => 'event',
-                'elementType' => $event->getName()
-            ];
-        }
-        
-    } catch (Exception $e) {
-        error_log("Error parsing BPMN XML: " . $e->getMessage());
-    }
-    
-    return $elements;
-}
-
-// Function to run process simulation
-function runProcessSimulation($conn, $processId, $scenarios) {
-    $results = [];
-    
-    foreach ($scenarios as $scenarioName => $scenario) {
-        $scenarioResults = [
-            'name' => $scenarioName,
-            'totalTime' => 0,
-            'totalCost' => 0,
-            'bottlenecks' => [],
-            'resourceUtilization' => [],
-            'steps' => []
-        ];
-        
-        // Simulate each step in the scenario
-        foreach ($scenario['steps'] as $stepId => $stepConfig) {
-            $stepResult = simulateStep($stepConfig);
-            $scenarioResults['steps'][$stepId] = $stepResult;
-            $scenarioResults['totalTime'] += $stepResult['duration'];
-            $scenarioResults['totalCost'] += $stepResult['cost'];
-            
-            // Check for bottlenecks
-            if ($stepResult['utilization'] > 0.8) {
-                $scenarioResults['bottlenecks'][] = [
-                    'stepId' => $stepId,
-                    'name' => $stepConfig['name'],
-                    'utilization' => $stepResult['utilization'],
-                    'waitTime' => $stepResult['waitTime']
-                ];
-            }
-        }
-        
-        $results[] = $scenarioResults;
-    }
-    
-    return $results;
-}
-
-// Function to simulate individual step
-function simulateStep($stepConfig) {
-    $baseTime = $stepConfig['duration'] ?? 60; // Default 60 minutes
-    $resources = $stepConfig['resources'] ?? 1;
-    $complexity = $stepConfig['complexity'] ?? 1;
-    
-    // Apply variability and complexity factors
-    $actualDuration = $baseTime * $complexity * (0.8 + (rand(0, 40) / 100)); // ±20% variability
-    $cost = ($stepConfig['hourlyRate'] ?? 50) * ($actualDuration / 60) * $resources;
-    $utilization = min(1.0, $resources * 0.7 + (rand(0, 30) / 100)); // Random utilization
-    $waitTime = $utilization > 0.8 ? $actualDuration * 0.2 : 0; // Wait time if overutilized
-    
-    return [
-        'duration' => round($actualDuration, 2),
-        'cost' => round($cost, 2),
-        'utilization' => round($utilization, 2),
-        'waitTime' => round($waitTime, 2),
-        'efficiency' => round((1 - ($waitTime / $actualDuration)) * 100, 1)
-    ];
-}
-
+// modules/M/simulation.php - Advanced Process Simulation Sub-page
+header('Content-Type: text/html; charset=utf-8');
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Process Simulation - MACTA Framework</title>
-    <link rel="stylesheet" href="../../assets/css/style.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
-    <style>
-        .simulation-container {
-            display: flex;
-            gap: 20px;
-            height: calc(100vh - 120px);
-        }
-        
-        .process-selector {
-            width: 300px;
-            background: white;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            height: fit-content;
-        }
-        
-        .simulation-workspace {
-            flex: 1;
-            background: white;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            overflow-y: auto;
-        }
-        
-        .process-item {
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            margin-bottom: 10px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .process-item:hover {
-            background: #f8f9fa;
-            border-color: var(--primary-color);
-        }
-        
-        .process-item.selected {
-            background: var(--primary-color);
-            color: white;
-            border-color: var(--primary-color);
-        }
-        
-        .element-config {
-            background: #f8f9fa;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            padding: 15px;
-            margin-bottom: 15px;
-        }
-        
-        .element-header {
-            display: flex;
-            justify-content: between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        
-        .element-type {
-            display: inline-block;
-            background: var(--primary-color);
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            text-transform: uppercase;
-        }
-        
-        .config-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 10px;
-        }
-        
-        .config-group {
-            background: white;
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-        }
-        
-        .simulation-controls {
-            background: #e8f4f8;
-            padding: 20px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-        }
-        
-        .scenario-tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        
-        .scenario-tab {
-            padding: 8px 16px;
-            background: #f8f9fa;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .scenario-tab.active {
-            background: var(--primary-color);
-            color: white;
-            border-color: var(--primary-color);
-        }
-        
-        .results-container {
-            margin-top: 30px;
-        }
-        
-        .results-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-        }
-        
-        .result-card {
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 20px;
-        }
-        
-        .metric-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid #eee;
-        }
-        
-        .bottleneck-item {
-            background: #fff3cd;
-            border: 1px solid #ffeeba;
-            border-radius: 4px;
-            padding: 8px;
-            margin-bottom: 8px;
-        }
-        
-        .chart-container {
-            width: 100%;
-            height: 300px;
-            margin-top: 20px;
-        }
-        
-        input[type="number"], input[type="text"], select {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 500;
-            color: #555;
-        }
-        
-        .hidden {
-            display: none;
-        }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <div class="container">
-            <div class="breadcrumb">
-                <a href="../../index.php">MACTA Framework</a> > 
-                <a href="index.php">Process Modeling</a> > 
-                Process Simulation
+
+<div class="tab-header">
+    <h2>
+        <span class="tab-icon">⚡</span>
+        Advanced Process Simulation
+    </h2>
+    <p>Run advanced simulations with different scenarios and color-coded runs for performance analysis</p>
+</div>
+
+<!-- Animation Status for Simulation -->
+<div class="animation-status" id="simulation-status">
+    <span>⚡</span>
+    <div>
+        <strong>Simulation Status:</strong>
+        <span id="simulation-text">Ready to simulate</span>
+    </div>
+    <div style="margin-left: auto;">
+        <strong>Total Runs: <span id="simulation-run-count">0</span></strong>
+    </div>
+</div>
+
+<!-- Enhanced Simulation Controls -->
+<div class="toolbar">
+    <button class="btn btn-success" id="btn-start-simulation">
+        ▶️ Start Simulation
+    </button>
+    <button class="btn btn-warning" id="btn-pause-simulation">
+        ⏸️ Pause
+    </button>
+    <button class="btn btn-danger" id="btn-stop-simulation">
+        ⏹️ Stop
+    </button>
+    <button class="btn btn-secondary" id="btn-reset-simulation">
+        🔄 Reset All
+    </button>
+    <div style="margin-left: auto; display: flex; align-items: center; gap: 10px;">
+        <label>Speed:</label>
+        <input type="range" id="sim-speed" min="0.5" max="3" step="0.1" value="1" style="width: 100px;">
+        <span id="speed-display">1x</span>
+    </div>
+</div>
+
+<!-- Simulation Configuration Panel -->
+<div class="simulation-config">
+    <h3>🎛️ Simulation Configuration</h3>
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+        <div class="config-group">
+            <label>Simulation Type:</label>
+            <select id="simulation-type">
+                <option value="single">Single Instance</option>
+                <option value="multiple">Multiple Instances</option>
+                <option value="stress">Stress Test</option>
+                <option value="monte-carlo">Monte Carlo</option>
+            </select>
+        </div>
+        <div class="config-group">
+            <label>Number of Instances:</label>
+            <input type="number" id="instance-count" value="5" min="1" max="100">
+        </div>
+        <div class="config-group">
+            <label>Inter-arrival Time (seconds):</label>
+            <input type="number" id="arrival-time" value="2" min="0.1" step="0.1">
+        </div>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <div class="config-group">
+            <label>Business Scenario:</label>
+            <select id="business-scenario">
+                <option value="standard">Standard Operations</option>
+                <option value="peak">Peak Load</option>
+                <option value="holiday">Holiday Season</option>
+                <option value="emergency">Emergency Response</option>
+            </select>
+        </div>
+        <div class="config-group">
+            <label>Resource Availability:</label>
+            <select id="resource-availability">
+                <option value="100">100% - Full Capacity</option>
+                <option value="80">80% - Normal Operations</option>
+                <option value="60">60% - Reduced Capacity</option>
+                <option value="40">40% - Critical Shortage</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<!-- Simulation Viewer -->
+<div id="simulation-viewer" style="height: 600px; border: 2px solid #ddd; border-radius: 10px; background: #fafafa; margin-bottom: 20px;">
+    <div class="loading">Click Start Simulation to begin advanced process simulation...</div>
+</div>
+
+<!-- Enhanced Performance Metrics -->
+<div class="performance-metrics">
+    <div class="metric-card">
+        <div class="metric-value" id="total-time">--</div>
+        <div class="metric-label">Total Process Time</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-value" id="active-tokens">0</div>
+        <div class="metric-label">Active Tokens</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-value" id="completed-instances">0</div>
+        <div class="metric-label">Completed Instances</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-value" id="efficiency-score">--</div>
+        <div class="metric-label">Efficiency Score</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-value" id="throughput">--</div>
+        <div class="metric-label">Throughput/Hour</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-value" id="avg-wait-time">--</div>
+        <div class="metric-label">Avg Wait Time</div>
+    </div>
+</div>
+
+<!-- Simulation Results Panel -->
+<div class="simulation-results">
+    <h3>📊 Simulation Results & Insights</h3>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <div class="results-panel">
+            <h4>📈 Performance Summary</h4>
+            <div class="result-item">
+                <span class="result-label">Total Simulation Time:</span>
+                <span class="result-value" id="sim-total-time">--</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Instances Processed:</span>
+                <span class="result-value" id="sim-processed">--</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Success Rate:</span>
+                <span class="result-value" id="sim-success-rate">--</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Resource Utilization:</span>
+                <span class="result-value" id="sim-utilization">--</span>
+            </div>
+        </div>
+        <div class="results-panel">
+            <h4>🎯 Key Insights</h4>
+            <div class="insights-list" id="simulation-insights">
+                <div class="insight-item">Start simulation to generate insights...</div>
             </div>
         </div>
     </div>
+</div>
 
-    <div class="container">
-        <div class="simulation-container">
-            <!-- Process Selector -->
-            <div class="process-selector">
-                <h3>Select Process</h3>
-                <div id="processList">
-                    <?php foreach ($processes as $process): ?>
-                        <div class="process-item" data-process-id="<?php echo $process['id']; ?>">
-                            <div style="font-weight: 500;"><?php echo htmlspecialchars($process['name']); ?></div>
-                            <div style="font-size: 12px; color: #666;">
-                                <?php echo $process['project_name'] ? htmlspecialchars($process['project_name']) : 'No Project'; ?>
-                            </div>
-                            <div style="font-size: 11px; color: #999;">
-                                Updated: <?php echo date('M d, Y', strtotime($process['updated_at'])); ?>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-
-            <!-- Simulation Workspace -->
-            <div class="simulation-workspace">
-                <div id="welcomeMessage">
-                    <h2>Process Simulation Engine</h2>
-                    <p>Select a process from the left panel to begin configuring simulation parameters.</p>
-                    
-                    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-top: 20px;">
-                        <h4>🎯 Simulation Features:</h4>
-                        <ul>
-                            <li><strong>Resource Assignment:</strong> Assign human resources, equipment, and costs to each step</li>
-                            <li><strong>Time Estimation:</strong> Set duration, complexity factors, and variability</li>
-                            <li><strong>Scenario Planning:</strong> Create multiple scenarios (Current State, Optimized, Future State)</li>
-                            <li><strong>Bottleneck Detection:</strong> Identify resource constraints and process inefficiencies</li>
-                            <li><strong>Cost Analysis:</strong> Calculate total process costs and resource utilization</li>
-                            <li><strong>Performance Metrics:</strong> Track cycle time, throughput, and efficiency</li>
-                        </ul>
-                    </div>
-                </div>
-
-                <div id="simulationContent" class="hidden">
-                    <!-- Scenario Selection -->
-                    <div class="scenario-tabs">
-                        <div class="scenario-tab active" data-scenario="current">Current State</div>
-                        <div class="scenario-tab" data-scenario="optimized">Optimized</div>
-                        <div class="scenario-tab" data-scenario="future">Future State</div>
-                    </div>
-
-                    <!-- Process Configuration -->
-                    <div id="processConfig">
-                        <h3 id="processTitle">Process Configuration</h3>
-                        <div id="elementsContainer"></div>
-                    </div>
-
-                    <!-- Simulation Controls -->
-                    <div class="simulation-controls">
-                        <h4>Simulation Parameters</h4>
-                        <div class="config-row">
-                            <div>
-                                <label>Number of Iterations:</label>
-                                <input type="number" id="iterations" value="100" min="10" max="1000">
-                            </div>
-                            <div>
-                                <label>Time Unit:</label>
-                                <select id="timeUnit">
-                                    <option value="minutes">Minutes</option>
-                                    <option value="hours">Hours</option>
-                                    <option value="days">Days</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div style="margin-top: 15px;">
-                            <button class="btn btn-primary" onclick="runSimulation()">▶️ Run Simulation</button>
-                            <button class="btn btn-secondary" onclick="saveConfiguration()">💾 Save Configuration</button>
-                            <button class="btn btn-secondary" onclick="exportResults()">📊 Export Results</button>
-                        </div>
-                    </div>
-
-                    <!-- Results Container -->
-                    <div id="resultsContainer" class="results-container hidden">
-                        <h3>Simulation Results</h3>
-                        <div id="resultsContent"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
+<!-- Color Legend for Simulation -->
+<div class="color-legend">
+    <h4>🎨 Simulation Color System</h4>
+    <p>Each simulation run gets a unique color that persists until reset</p>
+    <div class="legend-items" id="simulation-legend-items">
+        <!-- Dynamic legend items will be populated by JavaScript -->
     </div>
+</div>
 
-    <script>
-        let currentProcess = null;
-        let currentScenario = 'current';
-        let processElements = [];
-        let simulationConfig = {
-            current: {},
-            optimized: {},
-            future: {}
+<!-- BPMN.js styles -->
+<link rel="stylesheet" href="https://unpkg.com/bpmn-js@17.0.0/dist/assets/diagram-js.css" />
+<link rel="stylesheet" href="https://unpkg.com/bpmn-js@17.0.0/dist/assets/bpmn-font/css/bpmn-embedded.css" />
+
+<style>
+/* Simulation specific styles */
+.simulation-config {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    border: 1px solid var(--macta-light);
+}
+
+.config-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.config-group label {
+    font-weight: bold;
+    color: #333;
+}
+
+.config-group select,
+.config-group input {
+    padding: 8px;
+    border: 2px solid var(--macta-light);
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.config-group select:focus,
+.config-group input:focus {
+    border-color: var(--htt-blue);
+    outline: none;
+}
+
+/* Performance Metrics */
+.performance-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.metric-card {
+    background: linear-gradient(135deg, var(--macta-teal), var(--macta-green));
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    text-align: center;
+    transition: transform 0.3s ease;
+}
+
+.metric-card:hover {
+    transform: translateY(-3px);
+}
+
+.metric-value {
+    font-size: 28px;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+.metric-label {
+    font-size: 12px;
+    opacity: 0.9;
+}
+
+.simulation-results {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin: 20px 0;
+    border: 1px solid var(--macta-light);
+}
+
+.results-panel {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+}
+
+.result-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.result-item:last-child {
+    border-bottom: none;
+}
+
+.result-label {
+    font-weight: 500;
+}
+
+.result-value {
+    font-weight: bold;
+    color: var(--htt-blue);
+}
+
+.insights-list {
+    min-height: 120px;
+}
+
+.insight-item {
+    padding: 8px;
+    margin: 5px 0;
+    background: white;
+    border-radius: 5px;
+    border-left: 4px solid var(--macta-teal);
+    font-size: 14px;
+}
+
+/* Animation styles from view page */
+.animation-status {
+    background: white;
+    padding: 15px;
+    border-radius: 10px;
+    border-left: 4px solid var(--htt-blue);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.animation-status.running {
+    border-left-color: var(--macta-green);
+    background: #e8f5e8;
+}
+
+.animation-status.stopped {
+    border-left-color: var(--macta-red);
+    background: #ffebee;
+}
+
+.animation-status.completed {
+    border-left-color: var(--macta-teal);
+    background: #e0f7fa;
+}
+
+/* Same animation classes as view page for consistency */
+.animation-run-1 .djs-visual > rect,
+.animation-run-1 .djs-visual > circle,
+.animation-run-1 .djs-visual > polygon {
+    fill: #FF6B6B !important;
+    stroke: #e55555 !important;
+    stroke-width: 4px !important;
+    animation: pulse-1 1.5s infinite;
+}
+
+.animation-run-2 .djs-visual > rect,
+.animation-run-2 .djs-visual > circle,
+.animation-run-2 .djs-visual > polygon {
+    fill: #4ECDC4 !important;
+    stroke: #3cb8b1 !important;
+    stroke-width: 4px !important;
+    animation: pulse-2 1.5s infinite;
+}
+
+.animation-run-3 .djs-visual > rect,
+.animation-run-3 .djs-visual > circle,
+.animation-run-3 .djs-visual > polygon {
+    fill: #45B7D1 !important;
+    stroke: #3a9bc1 !important;
+    stroke-width: 4px !important;
+    animation: pulse-3 1.5s infinite;
+}
+
+.animation-run-4 .djs-visual > rect,
+.animation-run-4 .djs-visual > circle,
+.animation-run-4 .djs-visual > polygon {
+    fill: #96CEB4 !important;
+    stroke: #7bb89f !important;
+    stroke-width: 4px !important;
+    animation: pulse-4 1.5s infinite;
+}
+
+/* Pulse animations */
+@keyframes pulse-1 { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+@keyframes pulse-2 { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+@keyframes pulse-3 { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+@keyframes pulse-4 { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+</style>
+
+<script>
+// Simulation sub-page specific JavaScript
+let simulationViewer = null;
+let simulationRunCount = 0;
+let isSimulating = false;
+let simulationTimeouts = [];
+let simulationInterval = null;
+let simulationStartTime = null;
+
+// Animation colors system (same as view page)
+const animationColors = [
+    { name: 'Red Flow', css: 'animation-run-1', color: '#FF6B6B' },
+    { name: 'Teal Flow', css: 'animation-run-2', color: '#4ECDC4' },
+    { name: 'Blue Flow', css: 'animation-run-3', color: '#45B7D1' },
+    { name: 'Green Flow', css: 'animation-run-4', color: '#96CEB4' },
+    { name: 'Yellow Flow', css: 'animation-run-5', color: '#FFEAA7' },
+    { name: 'Purple Flow', css: 'animation-run-6', color: '#DDA0DD' },
+    { name: 'Mint Flow', css: 'animation-run-7', color: '#98D8C8' },
+    { name: 'Gold Flow', css: 'animation-run-8', color: '#F7DC6F' }
+];
+
+function loadScript(urls, callback) {
+    let currentIndex = 0;
+    
+    function tryNextUrl() {
+        if (currentIndex >= urls.length) {
+            console.error('All CDN sources failed');
+            return;
+        }
+        
+        const script = document.createElement('script');
+        script.src = urls[currentIndex];
+        script.onload = callback;
+        script.onerror = () => {
+            console.warn('Failed to load from:', urls[currentIndex]);
+            currentIndex++;
+            tryNextUrl();
         };
+        document.head.appendChild(script);
+    }
+    
+    tryNextUrl();
+}
 
-        // Process selection
-        document.querySelectorAll('.process-item').forEach(item => {
-            item.addEventListener('click', () => {
-                document.querySelectorAll('.process-item').forEach(p => p.classList.remove('selected'));
-                item.classList.add('selected');
-                loadProcessForSimulation(item.dataset.processId);
+function initializeSimulationViewer() {
+    const bpmnCdnUrls = [
+        'https://unpkg.com/bpmn-js@17.0.0/dist/bpmn-viewer.development.js',
+        'https://cdn.jsdelivr.net/npm/bpmn-js@17.0.0/dist/bpmn-viewer.development.js',
+        'https://unpkg.com/bpmn-js@16.0.0/dist/bpmn-viewer.development.js'
+    ];
+    
+    loadScript(bpmnCdnUrls, () => {
+        try {
+            if (typeof BpmnJS === 'undefined') {
+                throw new Error('BpmnJS not loaded');
+            }
+            
+            // Initialize simulation viewer
+            simulationViewer = new BpmnJS({
+                container: '#simulation-viewer'
             });
-        });
-
-        // Scenario tab switching
-        document.querySelectorAll('.scenario-tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                document.querySelectorAll('.scenario-tab').forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                currentScenario = tab.dataset.scenario;
-                updateConfigurationUI();
-            });
-        });
-
-        function loadProcessForSimulation(processId) {
-            fetch('simulation.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({
-                    action: 'load_process_for_simulation',
-                    process_id: processId
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    currentProcess = data.process;
-                    processElements = data.elements;
-                    
-                    document.getElementById('welcomeMessage').classList.add('hidden');
-                    document.getElementById('simulationContent').classList.remove('hidden');
-                    document.getElementById('processTitle').textContent = data.process.name;
-                    
-                    initializeSimulationConfig();
-                    renderElementConfiguration();
-                } else {
-                    alert('Error loading process: ' + data.message);
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Network error occurred');
-            });
+            
+            console.log('✅ BPMN Simulation Viewer initialized successfully');
+            
+            // Check if there's a process to simulate
+            const currentXML = sessionStorage.getItem('currentProcessXML');
+            if (currentXML) {
+                loadProcessInSimulation(currentXML);
+                updateSimulationStatus('ready', 'Process loaded - Configure and start simulation');
+            }
+            
+        } catch (error) {
+            console.error('Failed to initialize BPMN Simulation Viewer:', error);
+            document.querySelector('#simulation-viewer .loading').innerHTML = 'BPMN Simulation Viewer initialization failed: ' + error.message;
         }
+    });
+}
 
-        function initializeSimulationConfig() {
-            // Initialize default configurations for all scenarios
-            ['current', 'optimized', 'future'].forEach(scenario => {
-                simulationConfig[scenario] = { steps: {} };
+async function loadProcessInSimulation(xml) {
+    if (!simulationViewer) return;
+    
+    try {
+        await simulationViewer.importXML(xml);
+        simulationViewer.get('canvas').zoom('fit-viewport');
+        
+        const simLoading = document.querySelector('#simulation-viewer .loading');
+        if (simLoading) {
+            simLoading.style.display = 'none';
+        }
+        
+        updateSimulationStatus('ready', 'Process loaded - Ready for simulation');
+        
+    } catch (error) {
+        console.error('Failed to load process in simulation:', error);
+        updateSimulationStatus('error', 'Failed to load process');
+    }
+}
+
+function startSimulation() {
+    if (!simulationViewer || isSimulating) return;
+    
+    const simulationType = document.getElementById('simulation-type').value;
+    const instanceCount = parseInt(document.getElementById('instance-count').value) || 1;
+    const arrivalTime = parseFloat(document.getElementById('arrival-time').value) || 2;
+    
+    simulationRunCount++;
+    simulationStartTime = Date.now();
+    
+    updateSimulationStatus('running', `Running ${simulationType} simulation with ${instanceCount} instances`);
+    updateSimulationRunCount();
+    
+    isSimulating = true;
+    
+    // Start performance metrics tracking
+    startMetricsSimulation();
+    
+    // Run simulation based on type
+    if (simulationType === 'single') {
+        runSingleInstanceSimulation();
+    } else if (simulationType === 'multiple') {
+        runMultipleInstanceSimulation(instanceCount, arrivalTime);
+    } else if (simulationType === 'stress') {
+        runStressTestSimulation();
+    } else if (simulationType === 'monte-carlo') {
+        runMonteCarloSimulation();
+    }
+}
+
+function runSingleInstanceSimulation() {
+    const currentRun = ((simulationRunCount - 1) % 8) + 1;
+    const animationClass = `animation-run-${currentRun}`;
+    
+    try {
+        const elementRegistry = simulationViewer.get('elementRegistry');
+        const elements = elementRegistry.getAll();
+        const startEvent = elements.find(el => el.type === 'bpmn:StartEvent');
+        
+        if (startEvent) {
+            simulateProcessPath(startEvent, elementRegistry, animationClass, 1500);
+        }
+    } catch (error) {
+        console.error('Single instance simulation error:', error);
+    }
+}
+
+function runMultipleInstanceSimulation(instanceCount, arrivalTime) {
+    let currentInstance = 0;
+    
+    const spawnInstance = () => {
+        if (currentInstance < instanceCount && isSimulating) {
+            const currentRun = ((currentInstance) % 8) + 1;
+            const animationClass = `animation-run-${currentRun}`;
+            
+            try {
+                const elementRegistry = simulationViewer.get('elementRegistry');
+                const elements = elementRegistry.getAll();
+                const startEvent = elements.find(el => el.type === 'bpmn:StartEvent');
                 
-                processElements.forEach(element => {
-                    if (element.type === 'task') {
-                        simulationConfig[scenario].steps[element.id] = {
-                            name: element.name,
-                            duration: scenario === 'optimized' ? 45 : scenario === 'future' ? 30 : 60,
-                            resources: scenario === 'future' ? 2 : 1,
-                            hourlyRate: 50,
-                            complexity: scenario === 'optimized' ? 0.8 : 1,
-                            skillLevel: scenario === 'future' ? 'expert' : 'intermediate'
-                        };
-                    }
-                });
-            });
-        }
-
-        function renderElementConfiguration() {
-            const container = document.getElementById('elementsContainer');
-            container.innerHTML = '';
-
-            processElements.forEach(element => {
-                if (element.type === 'task') {
-                    const elementDiv = document.createElement('div');
-                    elementDiv.className = 'element-config';
-                    elementDiv.innerHTML = `
-                        <div class="element-header">
-                            <h4>${element.name}</h4>
-                            <span class="element-type">${element.elementType}</span>
-                        </div>
-                        <div class="config-row">
-                            <div>
-                                <label>Duration (${document.getElementById('timeUnit').value}):</label>
-                                <input type="number" id="duration_${element.id}" 
-                                       value="${simulationConfig[currentScenario].steps[element.id]?.duration || 60}"
-                                       onchange="updateElementConfig('${element.id}', 'duration', this.value)">
-                            </div>
-                            <div>
-                                <label>Resources Required:</label>
-                                <input type="number" id="resources_${element.id}" 
-                                       value="${simulationConfig[currentScenario].steps[element.id]?.resources || 1}"
-                                       onchange="updateElementConfig('${element.id}', 'resources', this.value)">
-                            </div>
-                        </div>
-                        <div class="config-row">
-                            <div>
-                                <label>Hourly Rate ($):</label>
-                                <input type="number" id="hourlyRate_${element.id}" 
-                                       value="${simulationConfig[currentScenario].steps[element.id]?.hourlyRate || 50}"
-                                       onchange="updateElementConfig('${element.id}', 'hourlyRate', this.value)">
-                            </div>
-                            <div>
-                                <label>Complexity Factor:</label>
-                                <input type="number" id="complexity_${element.id}" step="0.1" min="0.1" max="3"
-                                       value="${simulationConfig[currentScenario].steps[element.id]?.complexity || 1}"
-                                       onchange="updateElementConfig('${element.id}', 'complexity', this.value)">
-                            </div>
-                        </div>
-                        <div class="config-row">
-                            <div>
-                                <label>Skill Level Required:</label>
-                                <select id="skillLevel_${element.id}" 
-                                        onchange="updateElementConfig('${element.id}', 'skillLevel', this.value)">
-                                    <option value="beginner">Beginner</option>
-                                    <option value="intermediate" selected>Intermediate</option>
-                                    <option value="expert">Expert</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label>Equipment/Tools:</label>
-                                <input type="text" id="equipment_${element.id}" placeholder="e.g., Computer, Software"
-                                       value="${simulationConfig[currentScenario].steps[element.id]?.equipment || ''}"
-                                       onchange="updateElementConfig('${element.id}', 'equipment', this.value)">
-                            </div>
-                        </div>
-                    `;
-                    container.appendChild(elementDiv);
+                if (startEvent) {
+                    simulateProcessPath(startEvent, elementRegistry, animationClass, 1000);
                 }
-            });
-        }
-
-        function updateElementConfig(elementId, property, value) {
-            if (!simulationConfig[currentScenario].steps[elementId]) {
-                simulationConfig[currentScenario].steps[elementId] = {};
+            } catch (error) {
+                console.error('Multiple instance simulation error:', error);
             }
-            simulationConfig[currentScenario].steps[elementId][property] = 
-                property === 'skillLevel' || property === 'equipment' ? value : parseFloat(value);
-        }
-
-        function updateConfigurationUI() {
-            processElements.forEach(element => {
-                if (element.type === 'task' && simulationConfig[currentScenario].steps[element.id]) {
-                    const config = simulationConfig[currentScenario].steps[element.id];
-                    
-                    const durationInput = document.getElementById(`duration_${element.id}`);
-                    const resourcesInput = document.getElementById(`resources_${element.id}`);
-                    const hourlyRateInput = document.getElementById(`hourlyRate_${element.id}`);
-                    const complexityInput = document.getElementById(`complexity_${element.id}`);
-                    const skillLevelSelect = document.getElementById(`skillLevel_${element.id}`);
-                    const equipmentInput = document.getElementById(`equipment_${element.id}`);
-                    
-                    if (durationInput) durationInput.value = config.duration || 60;
-                    if (resourcesInput) resourcesInput.value = config.resources || 1;
-                    if (hourlyRateInput) hourlyRateInput.value = config.hourlyRate || 50;
-                    if (complexityInput) complexityInput.value = config.complexity || 1;
-                    if (skillLevelSelect) skillLevelSelect.value = config.skillLevel || 'intermediate';
-                    if (equipmentInput) equipmentInput.value = config.equipment || '';
-                }
-            });
-        }
-
-        function runSimulation() {
-            if (!currentProcess) {
-                alert('Please select a process first');
-                return;
+            
+            currentInstance++;
+            
+            if (currentInstance < instanceCount) {
+                const timeout = setTimeout(spawnInstance, arrivalTime * 1000);
+                simulationTimeouts.push(timeout);
             }
+        }
+    };
+    
+    spawnInstance();
+}
 
-            const iterations = document.getElementById('iterations').value;
+function runStressTestSimulation() {
+    updateSimulationInsights(['🔥 Stress test initiated - High volume simulation', '📈 Monitoring system performance under load']);
+    
+    // Simulate high load with rapid instance creation
+    runMultipleInstanceSimulation(20, 0.5);
+}
+
+function runMonteCarloSimulation() {
+    updateSimulationInsights(['🎲 Monte Carlo simulation started', '📊 Running statistical analysis with random variations']);
+    
+    // Run multiple scenarios with random parameters
+    for (let i = 0; i < 10; i++) {
+        const randomDelay = Math.random() * 3 + 0.5; // 0.5 to 3.5 seconds
+        setTimeout(() => {
+            if (isSimulating) {
+                runSingleInstanceSimulation();
+            }
+        }, i * randomDelay * 1000);
+    }
+}
+
+async function simulateProcessPath(currentElement, elementRegistry, animationClass, delay) {
+    if (!currentElement || !isSimulating) return;
+    
+    try {
+        const gfx = elementRegistry.getGraphics(currentElement);
+        if (gfx) {
+            gfx.classList.add(animationClass);
+            updateActiveTokens();
+        }
+    } catch (error) {
+        console.log('Element highlighting failed:', error);
+    }
+    
+    const timeout = setTimeout(async () => {
+        const outgoing = currentElement.businessObject?.outgoing;
+        if (outgoing && outgoing.length > 0) {
             
-            fetch('simulation.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({
-                    action: 'run_simulation',
-                    process_id: currentProcess.id,
-                    scenarios: JSON.stringify(simulationConfig),
-                    iterations: iterations
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    displayResults(data.results);
-                } else {
-                    alert('Simulation error: ' + data.message);
+            for (const flow of outgoing) {
+                const flowGfx = elementRegistry.getGraphics(flow);
+                if (flowGfx) {
+                    flowGfx.classList.add(animationClass);
                 }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Network error occurred');
-            });
-        }
-
-        function displayResults(results) {
-            const container = document.getElementById('resultsContainer');
-            const content = document.getElementById('resultsContent');
-            
-            container.classList.remove('hidden');
-            
-            let html = '<div class="results-grid">';
-            
-            results.forEach(result => {
-                html += `
-                    <div class="result-card">
-                        <h4>${result.name} Scenario</h4>
-                        <div class="metric-row">
-                            <span>Total Time:</span>
-                            <span><strong>${result.totalTime.toFixed(1)} min</strong></span>
-                        </div>
-                        <div class="metric-row">
-                            <span>Total Cost:</span>
-                            <span><strong>$${result.totalCost.toFixed(2)}</strong></span>
-                        </div>
-                        <div class="metric-row">
-                            <span>Bottlenecks:</span>
-                            <span><strong>${result.bottlenecks.length}</strong></span>
-                        </div>
-                        
-                        ${result.bottlenecks.length > 0 ? `
-                            <h5 style="margin-top: 15px; color: #856404;">⚠️ Identified Bottlenecks:</h5>
-                            ${result.bottlenecks.map(bottleneck => `
-                                <div class="bottleneck-item">
-                                    <strong>${bottleneck.name}</strong><br>
-                                    Utilization: ${(bottleneck.utilization * 100).toFixed(1)}%<br>
-                                    Wait Time: ${bottleneck.waitTime.toFixed(1)} min
-                                </div>
-                            `).join('')}
-                        ` : ''}
-                    </div>
-                `;
-            });
-            
-            html += '</div>';
-            
-            // Add comparison chart
-            html += `
-                <div class="chart-container">
-                    <canvas id="comparisonChart"></canvas>
-                </div>
-            `;
-            
-            content.innerHTML = html;
-            
-            // Create comparison chart
-            createComparisonChart(results);
-        }
-
-        function createComparisonChart(results) {
-            const ctx = document.getElementById('comparisonChart').getContext('2d');
-            
-            new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: results.map(r => r.name),
-                    datasets: [
-                        {
-                            label: 'Total Time (min)',
-                            data: results.map(r => r.totalTime),
-                            backgroundColor: 'rgba(54, 162, 235, 0.5)',
-                            borderColor: 'rgba(54, 162, 235, 1)',
-                            borderWidth: 1,
-                            yAxisID: 'y'
-                        },
-                        {
-                            label: 'Total Cost ($)',
-                            data: results.map(r => r.totalCost),
-                            backgroundColor: 'rgba(255, 99, 132, 0.5)',
-                            borderColor: 'rgba(255, 99, 132, 1)',
-                            borderWidth: 1,
-                            yAxisID: 'y1'
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            type: 'linear',
-                            display: true,
-                            position: 'left',
-                            title: {
-                                display: true,
-                                text: 'Time (minutes)'
-                            }
-                        },
-                        y1: {
-                            type: 'linear',
-                            display: true,
-                            position: 'right',
-                            title: {
-                                display: true,
-                                text: 'Cost ($)'
-                            },
-                            grid: {
-                                drawOnChartArea: false,
-                            },
-                        }
-                    },
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: 'Scenario Comparison: Time vs Cost'
+                
+                const nextElement = elementRegistry.get(flow.targetRef?.id);
+                if (nextElement && isSimulating) {
+                    if (nextElement.type !== 'bpmn:EndEvent') {
+                        await simulateProcessPath(nextElement, elementRegistry, animationClass, delay);
+                    } else {
+                        const endGfx = elementRegistry.getGraphics(nextElement);
+                        if (endGfx) {
+                            endGfx.classList.add(animationClass);
+                            updateCompletedInstances();
                         }
                     }
                 }
-            });
-        }
-
-        function saveConfiguration() {
-            if (!currentProcess) {
-                alert('Please select a process first');
-                return;
             }
+        }
+    }, delay);
+    
+    simulationTimeouts.push(timeout);
+}
 
-            fetch('simulation.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({
-                    action: 'save_simulation_config',
-                    process_id: currentProcess.id,
-                    config: JSON.stringify(simulationConfig)
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert('Configuration saved successfully!');
-                } else {
-                    alert('Error saving configuration: ' + data.message);
+function pauseSimulation() {
+    isSimulating = false;
+    simulationTimeouts.forEach(timeout => clearTimeout(timeout));
+    simulationTimeouts = [];
+    
+    if (simulationInterval) {
+        clearInterval(simulationInterval);
+        simulationInterval = null;
+    }
+    
+    updateSimulationStatus('paused', 'Simulation paused');
+}
+
+function stopSimulation() {
+    isSimulating = false;
+    simulationTimeouts.forEach(timeout => clearTimeout(timeout));
+    simulationTimeouts = [];
+    
+    if (simulationInterval) {
+        clearInterval(simulationInterval);
+        simulationInterval = null;
+    }
+    
+    updateSimulationStatus('stopped', 'Simulation stopped');
+    generateSimulationReport();
+}
+
+function resetSimulation() {
+    stopSimulation();
+    
+    // Clear all highlights
+    if (simulationViewer) {
+        clearAllHighlights();
+    }
+    
+    // Reset counters and metrics
+    simulationRunCount = 0;
+    updateSimulationRunCount();
+    resetMetrics();
+    
+    updateSimulationStatus('ready', 'Simulation reset - Ready for new simulation');
+    updateSimulationInsights(['Simulation reset', 'Configure parameters and start new simulation']);
+}
+
+function clearAllHighlights() {
+    try {
+        const elementRegistry = simulationViewer.get('elementRegistry');
+        const elements = elementRegistry.getAll();
+        
+        elements.forEach(element => {
+            const gfx = elementRegistry.getGraphics(element);
+            if (gfx) {
+                for (let i = 1; i <= 8; i++) {
+                    gfx.classList.remove(`animation-run-${i}`);
                 }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Network error occurred');
-            });
-        }
-
-        function exportResults() {
-            // Create downloadable report
-            const results = document.getElementById('resultsContent').innerHTML;
-            if (!results) {
-                alert('No simulation results to export. Please run a simulation first.');
-                return;
-            }
-
-            const reportContent = `
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>Process Simulation Report - ${currentProcess ? currentProcess.name : 'Unknown'}</title>
-                    <style>
-                        body { font-family: Arial, sans-serif; margin: 40px; }
-                        .header { text-align: center; margin-bottom: 30px; }
-                        .metric-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
-                        .result-card { border: 1px solid #ddd; padding: 20px; margin: 20px 0; border-radius: 8px; }
-                        .bottleneck-item { background: #fff3cd; padding: 8px; margin: 8px 0; border-radius: 4px; }
-                    </style>
-                </head>
-                <body>
-                    <div class="header">
-                        <h1>Process Simulation Report</h1>
-                        <h2>${currentProcess ? currentProcess.name : 'Unknown Process'}</h2>
-                        <p>Generated on: ${new Date().toLocaleString()}</p>
-                    </div>
-                    ${results}
-                </body>
-                </html>
-            `;
-
-            const blob = new Blob([reportContent], { type: 'text/html' });
-            const url = URL.createObjectURL(blob);
-            
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `simulation_report_${currentProcess ? currentProcess.name.replace(/[^a-z0-9]/gi, '_') : 'unknown'}_${new Date().getTime()}.html`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-        }
-
-        // Auto-save configuration when user makes changes
-        let autoSaveTimeout;
-        function scheduleAutoSave() {
-            clearTimeout(autoSaveTimeout);
-            autoSaveTimeout = setTimeout(() => {
-                if (currentProcess) {
-                    saveConfiguration();
-                }
-            }, 5000); // Auto-save after 5 seconds of inactivity
-        }
-
-        // Add event listeners for auto-save
-        document.addEventListener('change', (e) => {
-            if (e.target.id && e.target.id.includes('_')) {
-                scheduleAutoSave();
             }
         });
-    </script>
-</body>
-</html>
+        
+    } catch (error) {
+        console.error('Failed to clear highlights:', error);
+    }
+}
+
+function startMetricsSimulation() {
+    let totalTime = 0;
+    
+    simulationInterval = setInterval(() => {
+        if (!isSimulating) {
+            clearInterval(simulationInterval);
+            return;
+        }
+        
+        totalTime += 1;
+        
+        // Update metrics
+        const minutes = Math.floor(totalTime / 60);
+        const seconds = totalTime % 60;
+        const timeDisplay = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+        
+        document.getElementById('total-time').textContent = timeDisplay;
+        
+        // Calculate throughput
+        const completed = parseInt(document.getElementById('completed-instances').textContent) || 0;
+        if (totalTime > 0) {
+            const throughput = Math.round((completed / totalTime) * 3600); // per hour
+            document.getElementById('throughput').textContent = throughput;
+        }
+        
+        // Calculate efficiency score
+        if (totalTime > 0 && completed > 0) {
+            const efficiency = Math.min(100, Math.round((completed / (totalTime / 30)) * 100));
+            document.getElementById('efficiency-score').textContent = `${efficiency}%`;
+        }
+        
+        // Calculate average wait time
+        const avgWait = Math.max(1, Math.round(totalTime / Math.max(1, completed)));
+        document.getElementById('avg-wait-time').textContent = `${avgWait}s`;
+        
+    }, 1000);
+}
+
+function updateActiveTokens() {
+    const activeCount = document.querySelectorAll('#simulation-viewer [class*="animation-run-"]').length;
+    document.getElementById('active-tokens').textContent = activeCount;
+}
+
+function updateCompletedInstances() {
+    const completed = parseInt(document.getElementById('completed-instances').textContent) + 1;
+    document.getElementById('completed-instances').textContent = completed;
+}
+
+function resetMetrics() {
+    document.getElementById('total-time').textContent = '--';
+    document.getElementById('active-tokens').textContent = '0';
+    document.getElementById('completed-instances').textContent = '0';
+    document.getElementById('efficiency-score').textContent = '--';
+    document.getElementById('throughput').textContent = '--';
+    document.getElementById('avg-wait-time').textContent = '--';
+}
+
+function updateSimulationStatus(status, text) {
+    const statusElement = document.getElementById('simulation-status');
+    const textElement = document.getElementById('simulation-text');
+    
+    if (statusElement && textElement) {
+        statusElement.className = `animation-status ${status}`;
+        textElement.textContent = text;
+    }
+}
+
+function updateSimulationRunCount() {
+    const countElement = document.getElementById('simulation-run-count');
+    if (countElement) {
+        countElement.textContent = simulationRunCount;
+    }
+}
+
+function updateSimulationInsights(insights) {
+    const insightsContainer = document.getElementById('simulation-insights');
+    if (!insightsContainer) return;
+    
+    insightsContainer.innerHTML = '';
+    insights.forEach(insight => {
+        const item = document.createElement('div');
+        item.className = 'insight-item';
+        item.textContent = insight;
+        insightsContainer.appendChild(item);
+    });
+}
+
+function generateSimulationReport() {
+    const simulationTime = simulationStartTime ? Math.round((Date.now() - simulationStartTime) / 1000) : 0;
+    const completed = parseInt(document.getElementById('completed-instances').textContent) || 0;
+    const efficiency = document.getElementById('efficiency-score').textContent;
+    const throughput = document.getElementById('throughput').textContent;
+    
+    // Update results panel
+    document.getElementById('sim-total-time').textContent = `${simulationTime}s`;
+    document.getElementById('sim-processed').textContent = completed;
+    document.getElementById('sim-success-rate').textContent = '100%'; // Simplified
+    document.getElementById('sim-utilization').textContent = efficiency;
+    
+    // Generate insights
+    const insights = [
+        `✅ Simulation completed in ${simulationTime} seconds`,
+        `📊 Processed ${completed} instances successfully`,
+        `⚡ Average throughput: ${throughput} instances/hour`,
+        `🎯 Efficiency score: ${efficiency}`,
+        '💡 Consider optimizing bottleneck tasks for better performance'
+    ];
+    
+    updateSimulationInsights(insights);
+}
+
+function updateColorLegend() {
+    const legendContainer = document.getElementById('simulation-legend-items');
+    if (!legendContainer) return;
+    
+    legendContainer.innerHTML = '';
+    animationColors.forEach((color, index) => {
+        const item = document.createElement('div');
+        item.className = 'legend-item';
+        item.innerHTML = `
+            <div class="legend-color" style="background-color: ${color.color}"></div>
+            <span>Run ${index + 1}: ${color.name}</span>
+        `;
+        legendContainer.appendChild(item);
+    });
+}
+
+// Event listeners
+document.addEventListener('tabContentLoaded', function(e) {
+    if (e.detail.tabName === 'simulation') {
+        console.log('⚡ Simulation tab content loaded');
+        
+        // Initialize BPMN Simulation Viewer
+        initializeSimulationViewer();
+        
+        // Initialize color legend
+        updateColorLegend();
+        
+        // Reset metrics
+        resetMetrics();
+        
+        // Attach event listeners
+        attachSimulationEventListeners();
+    }
+});
+
+function attachSimulationEventListeners() {
+    // Simulation controls
+    document.getElementById('btn-start-simulation')?.addEventListener('click', () => {
+        startSimulation();
+    });
+
+    document.getElementById('btn-pause-simulation')?.addEventListener('click', () => {
+        pauseSimulation();
+    });
+
+    document.getElementById('btn-stop-simulation')?.addEventListener('click', () => {
+        stopSimulation();
+    });
+
+    document.getElementById('btn-reset-simulation')?.addEventListener('click', () => {
+        resetSimulation();
+    });
+
+    // Speed control
+    document.getElementById('sim-speed')?.addEventListener('input', (e) => {
+        document.getElementById('speed-display').textContent = e.target.value + 'x';
+    });
+
+    // Configuration change handlers
+    document.getElementById('simulation-type')?.addEventListener('change', (e) => {
+        const type = e.target.value;
+        const instanceCountGroup = document.getElementById('instance-count').closest('.config-group');
+        const arrivalTimeGroup = document.getElementById('arrival-time').closest('.config-group');
+        
+        if (type === 'single') {
+            instanceCountGroup.style.opacity = '0.5';
+            arrivalTimeGroup.style.opacity = '0.5';
+        } else {
+            instanceCountGroup.style.opacity = '1';
+            arrivalTimeGroup.style.opacity = '1';
+        }
+    });
+}
+
+console.log('⚡ Simulation sub-page script loaded');
