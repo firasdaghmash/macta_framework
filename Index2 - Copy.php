@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MACTA Framework | Professional Process Management Solutions</title>
-    <meta name="description" content="The comprehensive MACTA Framework provides systematic process optimization through modeling, analysis, customization, training, and assessment for superior business results.">
+    <title>MACTA Framework - High Tech Talents | Professional Process Management Solutions</title>
+    <meta name="description" content="HTT's comprehensive MACTA Framework provides systematic process optimization through modeling, analysis, customization, training, and assessment for superior business results.">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -56,11 +56,11 @@
 
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #0F172A 0%, #1E293B 30%, #334155 100%);
+            background: linear-gradient(135deg, var(--htt-primary) 0%, var(--htt-primary-dark) 50%, #0F172A 100%);
             background-attachment: fixed;
             min-height: 100vh;
             line-height: 1.6;
-            color: white;
+            color: var(--text-primary);
             overflow-x: hidden;
         }
 
@@ -72,18 +72,11 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: 
-                radial-gradient(circle at 20% 20%, rgba(44, 125, 199, 0.1) 0%, transparent 50%),
-                radial-gradient(circle at 80% 80%, rgba(56, 178, 172, 0.08) 0%, transparent 50%),
-                radial-gradient(circle at 50% 50%, rgba(255, 123, 43, 0.05) 0%, transparent 70%);
+            background-image: 
+                radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 75% 75%, rgba(255, 255, 255, 0.05) 0%, transparent 50%);
             pointer-events: none;
             z-index: -1;
-            animation: float 20s ease-in-out infinite;
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translateY(0px) rotate(0deg); }
-            50% { transform: translateY(-20px) rotate(1deg); }
         }
 
         .container {
@@ -134,17 +127,38 @@
             transform: translateY(-2px);
         }
 
-        /* Enhanced Logo with New MACTA Transparent Logo */
+        /* Enhanced Logo with Professional Styling */
         .logo-icon {
-            width: auto;
-            height: 80px;
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, var(--htt-primary), var(--htt-primary-light));
+            border-radius: var(--border-radius-md);
+            box-shadow: var(--card-shadow);
             transition: all var(--transition-normal);
-            filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.15));
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+            font-weight: 800;
         }
 
-        .logo-icon:hover {
-            transform: scale(1.05);
-            filter: drop-shadow(0 8px 20px rgba(44, 125, 199, 0.3));
+        .logo-icon::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.3) 50%, transparent 70%);
+            transform: translateX(-100%);
+            transition: transform 0.6s ease;
+        }
+
+        .logo-section:hover .logo-icon::before {
+            transform: translateX(100%);
         }
 
         .company-info h1 {
@@ -203,31 +217,27 @@
         }
 
         .btn-outline {
-            border: 2px solid rgba(44, 125, 199, 0.4);
-            color: #2C7DC7;
-            background: rgba(44, 125, 199, 0.05);
-            backdrop-filter: blur(10px);
+            border: 2px solid var(--htt-primary);
+            color: var(--htt-primary);
+            background: transparent;
         }
 
         .btn-outline:hover {
-            background: rgba(44, 125, 199, 0.1);
-            border-color: #2C7DC7;
-            color: #1B5B9E;
+            background: var(--htt-primary);
+            color: white;
             transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(44, 125, 199, 0.2);
+            box-shadow: var(--card-shadow);
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, #2C7DC7, #1B5B9E);
+            background: linear-gradient(135deg, var(--htt-primary), var(--htt-primary-dark));
             color: white;
-            box-shadow: 0 4px 15px rgba(44, 125, 199, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: var(--card-shadow);
         }
 
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(44, 125, 199, 0.4);
-            background: linear-gradient(135deg, #1B5B9E, #2C7DC7);
+            box-shadow: var(--card-shadow-hover);
         }
 
         /* Enhanced Main Content */
@@ -944,7 +954,7 @@
 
         /* Enhanced Customer Satisfaction Section */
         .satisfaction-section {
-            background: linear-gradient(135deg, #2C7DC7 0%, #1B5B9E 50%, #38B2AC 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border-radius: var(--border-radius-xl);
             padding: 80px 60px;
             margin-top: 100px;
@@ -1277,197 +1287,6 @@
             z-index: 9999;
             transition: width 0.1s ease;
         }
-
-        /* Creator Section Styles */
-        .creator-section {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px) saturate(180%);
-            -webkit-backdrop-filter: blur(20px) saturate(180%);
-            border-radius: var(--border-radius-xl);
-            padding: 80px 60px;
-            margin: 80px 0;
-            box-shadow: var(--card-shadow-hover);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            position: relative;
-        }
-
-        .creator-section::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 8px;
-            background: linear-gradient(90deg, var(--htt-primary), var(--modeling-primary), var(--analysis-primary));
-            border-radius: var(--border-radius-xl) var(--border-radius-xl) 0 0;
-        }
-
-        .creator-content {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 60px;
-            align-items: center;
-        }
-
-        .creator-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            background: linear-gradient(135deg, var(--htt-primary), var(--htt-primary-light));
-            color: white;
-            padding: 8px 16px;
-            border-radius: var(--border-radius-sm);
-            font-size: 14px;
-            font-weight: 600;
-            margin-bottom: 24px;
-        }
-
-        .creator-info h3 {
-            font-family: 'Poppins', sans-serif;
-            font-size: 36px;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: 20px;
-            letter-spacing: -0.5px;
-        }
-
-        .creator-description {
-            font-size: 18px;
-            line-height: 1.7;
-            color: var(--text-secondary);
-            margin-bottom: 32px;
-        }
-
-        .creator-highlights {
-            display: flex;
-            gap: 32px;
-            margin-bottom: 40px;
-            flex-wrap: wrap;
-        }
-
-        .highlight-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            color: var(--text-secondary);
-            font-weight: 600;
-        }
-
-        .highlight-item i {
-            color: var(--htt-primary);
-            font-size: 20px;
-        }
-
-        .creator-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 12px;
-            padding: 16px 32px;
-            font-size: 16px;
-            font-weight: 600;
-            text-decoration: none;
-            border-radius: var(--border-radius-md);
-            background: linear-gradient(135deg, var(--htt-primary), var(--htt-primary-dark));
-            color: white;
-            box-shadow: var(--card-shadow);
-            transition: all var(--transition-normal);
-        }
-
-        .creator-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--card-shadow-hover);
-            text-decoration: none;
-            color: white;
-        }
-
-        .profile-card {
-            background: white;
-            border-radius: var(--border-radius-lg);
-            padding: 32px;
-            box-shadow: var(--card-shadow);
-            text-align: center;
-            transition: all var(--transition-normal);
-        }
-
-        .profile-card:hover {
-            transform: translateY(-4px);
-            box-shadow: var(--card-shadow-hover);
-        }
-
-        .creator-image {
-            width: 160px;
-            height: 160px;
-            border-radius: 50%;
-            object-fit: cover;
-            margin-bottom: 24px;
-            border: 4px solid var(--htt-accent);
-            transition: all var(--transition-normal);
-        }
-
-        .creator-image:hover {
-            transform: scale(1.05);
-            border-color: var(--htt-primary);
-        }
-
-        .profile-info h4 {
-            font-family: 'Poppins', sans-serif;
-            font-size: 24px;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: 8px;
-        }
-
-        .profile-info p {
-            color: var(--text-secondary);
-            font-weight: 500;
-            margin-bottom: 4px;
-        }
-
-        .credentials {
-            background: linear-gradient(135deg, var(--htt-primary), var(--htt-primary-light));
-            color: white;
-            padding: 8px 16px;
-            border-radius: var(--border-radius-sm);
-            font-size: 14px;
-            font-weight: 600;
-            display: inline-block;
-            margin-top: 12px;
-        }
-
-        /* Responsive Design for Creator Section */
-        @media (max-width: 1024px) {
-            .creator-content {
-                grid-template-columns: 1fr;
-                gap: 40px;
-                text-align: center;
-            }
-            
-            .creator-highlights {
-                justify-content: center;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .creator-section {
-                padding: 40px 24px;
-                margin: 40px 0;
-            }
-            
-            .creator-info h3 {
-                font-size: 28px;
-            }
-            
-            .creator-highlights {
-                flex-direction: column;
-                gap: 16px;
-                align-items: center;
-            }
-            
-            .creator-image {
-                width: 120px;
-                height: 120px;
-            }
-        }
     </style>
 </head>
 <body>
@@ -1483,7 +1302,11 @@
         <div class="container">
             <div class="header-content">
                 <div class="logo-section">
-                    <img src="assets/images/macta4-transperent.png" alt="MACTA Framework" class="logo-icon">
+                    <div class="logo-icon">HTT</div>
+                    <div class="company-info">
+                        <h1>High Tech Talents</h1>
+                        <div class="company-tagline">Managed Services Excellence</div>
+                    </div>
                 </div>
                 <div class="header-actions">
                     <a href="#contact" class="btn btn-outline">
@@ -1505,7 +1328,7 @@
                 <h1 class="framework-title">MACTA Framework</h1>
                 <p class="framework-subtitle">Modeling — Analysis — Customization — Training — Assessment</p>
                 <p class="framework-description">
-                    Transform your business processes with our comprehensive MACTA Framework. Our systematic approach 
+                    Transform your business processes with HTT's comprehensive MACTA Framework. Our systematic approach 
                     combines visual process modeling, data-driven analysis, customized solutions, targeted training programs, 
                     and continuous performance assessment to deliver measurable results and superior customer satisfaction.
                 </p>
@@ -1698,51 +1521,6 @@
                 </div>
             </section>
 
-            <!-- Creator Section -->
-            <section class="creator-section fade-in" id="creator">
-                <div class="creator-content">
-                    <div class="creator-info">
-                        <div class="creator-badge">
-                            <i class="fas fa-user-tie"></i>
-                            <span>Framework Creator</span>
-                        </div>
-                        <h3>Meet the Visionary Behind MACTA</h3>
-                        <p class="creator-description">
-                            Discover the expertise and innovation that drives the MACTA Framework. Learn about the creator's 
-                            journey, achievements, and the vision that transforms business processes worldwide.
-                        </p>
-                        <div class="creator-highlights">
-                            <div class="highlight-item">
-                                <i class="fas fa-award"></i>
-                                <span>20+ Years Experience</span>
-                            </div>
-                            <div class="highlight-item">
-                                <i class="fas fa-trophy"></i>
-                                <span>Award-Winning Researcher</span>
-                            </div>
-                            <div class="highlight-item">
-                                <i class="fas fa-chart-line"></i>
-                                <span>Proven Results</span>
-                            </div>
-                        </div>
-                        <a href="bio.html" class="btn btn-primary creator-btn">
-                            <i class="fas fa-user"></i>
-                            Learn More About the Creator
-                        </a>
-                    </div>
-                    <div class="creator-profile">
-                        <div class="profile-card">
-                            <img src="assets/images/FD.png" alt="Firas M. Dagmash" class="creator-image">
-                            <div class="profile-info">
-                                <h4>Firas Dagmash</h4>
-                                <p>Creator of MACTA Framework</p>
-                                <p class="credentials">Operation Manager at HTT</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
             <!-- Testimonials Section -->
             <section class="testimonials-section fade-in" id="testimonials">
                 <div class="testimonials-header">
@@ -1764,7 +1542,7 @@
                     </div>
                     <div class="testimonial-card">
                         <p class="testimonial-quote">
-                            "MACTA's analytical capabilities are outstanding. The real-time dashboards and predictive insights have given us unprecedented visibility into our business processes. Customer satisfaction has never been higher."
+                            "HTT's analytical capabilities are outstanding. The real-time dashboards and predictive insights have given us unprecedented visibility into our business processes. Customer satisfaction has never been higher."
                         </p>
                         <div class="testimonial-author">
                             <div class="author-avatar">MJ</div>
@@ -1801,7 +1579,7 @@
                         <div class="contact-details">
                             <div class="contact-item">
                                 <i class="fas fa-envelope"></i>
-                                <span>info@macta-framework.com</span>
+                                <span>info@httalents.com</span>
                             </div>
                             <div class="contact-item">
                                 <i class="fas fa-phone"></i>
@@ -1809,7 +1587,7 @@
                             </div>
                             <div class="contact-item">
                                 <i class="fas fa-map-marker-alt"></i>
-                                <span>19 ME MARAR Street, Amman, Jordan</span>
+                                <span>91 Queen Rania Street, Amman, Jordan</span>
                             </div>
                             <div class="contact-item">
                                 <i class="fas fa-clock"></i>
@@ -1876,7 +1654,7 @@
     <footer class="footer">
         <div class="container">
             <div class="footer-content">
-                <p>&copy; 2025 MACTA Framework. Transforming businesses through innovative process management solutions.</p>
+                <p>&copy; 2024 High Tech Talents. Transforming businesses through innovative process management solutions.</p>
             </div>
             <div class="footer-links">
                 <a href="#framework">Framework</a>
