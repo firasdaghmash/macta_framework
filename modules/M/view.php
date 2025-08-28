@@ -1487,23 +1487,67 @@ For detailed implementation guidance, consult your MACTA specialist.
             console.log('Status:', message);
         }
 
-        // Wait for DOM and initialize
+        // Wait for DOM and initialize - Updated for AJAX loading
         document.addEventListener('DOMContentLoaded', function() {
             console.log('DOM loaded, initializing BPMN Viewer...');
-            
+            initializeViewer();
+        });
+
+        // Listen for tab content loaded event (when loaded via AJAX)
+        document.addEventListener('tabContentLoaded', function(e) {
+            if (e.detail.tabName === 'view') {
+                console.log('View tab loaded via AJAX, initializing...');
+                setTimeout(initializeViewer, 200);
+            }
+        });
+
+        // Listen for scripts ready event (when all external scripts loaded)
+        document.addEventListener('tabScriptsReady', function(e) {
+            if (e.detail.tabName === 'view') {
+                console.log('View tab scripts ready, initializing...');
+                setTimeout(initializeViewer, 300);
+            }
+        });
+
+        // Centralized initialization function
+        function initializeViewer() {
+            // Check if already initialized
+            if (window.viewerInitialized) {
+                console.log('Viewer already initialized, skipping...');
+                return;
+            }
+
             // Check for database errors
             if (dbError) {
                 updateStatus('Database Error: ' + dbError);
+                const viewerContainer = document.querySelector('#bpmn-viewer');
+                if (viewerContainer) {
+                    viewerContainer.querySelector('.loading').innerHTML = 
+                        '<div style="text-align: center;"><h3>Database Configuration Error</h3><p>' + dbError + '</p></div>';
+                }
                 return;
             }
             
-            // Initialize
+            // Check if BPMN container exists
+            const viewerContainer = document.querySelector('#bpmn-viewer');
+            if (!viewerContainer) {
+                console.log('BPMN viewer container not found, retrying...');
+                setTimeout(initializeViewer, 500);
+                return;
+            }
+
+            // Initialize BPMN Viewer and setup
             setTimeout(() => {
                 initializeBpmnViewer();
                 setupEventListeners();
                 updateColorLegend();
+                populateDropdowns(); // Add this to ensure dropdowns are populated
+                window.viewerInitialized = true;
             }, 100);
-        });
+        }
+
+        // Make initializeBpmnViewer globally available for manual triggering
+        window.initializeBpmnViewer = initializeBpmnViewer;
 
         // Keyboard shortcuts
         document.addEventListener('keydown', function(event) {

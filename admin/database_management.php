@@ -1,13 +1,22 @@
 <?php
 // admin/database_management.php - Database Management with CRUD Operations
-require_once '../config/database.php';
+require_once '../config/config.php';
 
-// Use the Database class from config
-$db = new Database();
-$conn = $db->getConnection();
-
-if (!$conn) {
-    die("Database connection failed. Please check your configuration.");
+// Create database connection using existing config
+try {
+    $conn = new PDO(
+        "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4",
+        DB_USER,
+        DB_PASS,
+        [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES => false,
+            PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4"
+        ]
+    );
+} catch(PDOException $e) {
+    die("Database connection failed: " . $e->getMessage() . "<br><br>Please check your database configuration in config/config.php");
 }
 
 // Handle AJAX requests
@@ -47,6 +56,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         $value = password_hash(substr($value, 5), PASSWORD_DEFAULT);
                     }
                     
+                    // Handle JSON fields
+                    if (in_array($field, ['model_data', 'config_data', 'scenario_data', 'results_data', 'template_data', 'performance_metrics', 'modules', 'path_data', 'bottleneck_tasks', 'optimization_suggestions', 'expected_impact', 'complexity_distribution', 'seasonal_factors'])) {
+                        if ($value && is_string($value)) {
+                            // Validate JSON
+                            $decoded = json_decode($value);
+                            if (json_last_error() !== JSON_ERROR_NONE) {
+                                throw new Exception("Invalid JSON in field {$field}: " . json_last_error_msg());
+                            }
+                        }
+                    }
+                    
                     $stmt->bindValue(":{$field}", $value);
                 }
                 
@@ -75,6 +95,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         $value = password_hash(substr($value, 5), PASSWORD_DEFAULT);
                     }
                     
+                    // Handle JSON fields
+                    if (in_array($field, ['model_data', 'config_data', 'scenario_data', 'results_data', 'template_data', 'performance_metrics', 'modules', 'path_data', 'bottleneck_tasks', 'optimization_suggestions', 'expected_impact', 'complexity_distribution', 'seasonal_factors'])) {
+                        if ($value && is_string($value)) {
+                            // Validate JSON
+                            $decoded = json_decode($value);
+                            if (json_last_error() !== JSON_ERROR_NONE) {
+                                throw new Exception("Invalid JSON in field {$field}: " . json_last_error_msg());
+                            }
+                        }
+                    }
+                    
                     $values[] = $value;
                 }
                 $values[] = $id;
@@ -95,6 +126,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $structure = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 echo json_encode(['success' => true, 'structure' => $structure]);
                 break;
+                
+            case 'get_count':
+                $stmt = $conn->prepare("SELECT COUNT(*) as count FROM {$table}");
+                $stmt->execute();
+                $count = $stmt->fetch(PDO::FETCH_ASSOC);
+                echo json_encode(['success' => true, 'count' => $count['count']]);
+                break;
         }
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -102,25 +140,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     exit;
 }
 
-// Table configurations organized by tabs
+// Table configurations organized by tabs - Complete database schema
 $table_configs = [
     'users_projects' => [
         'title' => 'Users & Projects Management',
         'icon' => '👥',
         'tables' => [
             'users' => ['name' => 'Users', 'icon' => '👤'],
-            'projects' => ['name' => 'Projects', 'icon' => '📁']
+            'projects' => ['name' => 'Projects', 'icon' => '📁'],
+            'job_descriptions' => ['name' => 'Job Descriptions', 'icon' => '📝']
         ]
     ],
     'process_management' => [
         'title' => 'Process Management',
         'icon' => '🔄',
         'tables' => [
+            'process_models' => ['name' => 'Process Models', 'icon' => '🗂️'],
+            'process_tasks' => ['name' => 'Process Tasks', 'icon' => '📋'],
             'process_arrival_configs' => ['name' => 'Arrival Configs', 'icon' => '📅'],
-            'process_models' => ['name' => 'Process Models', 'icon' => '🏗️'],
             'process_path_analysis' => ['name' => 'Path Analysis', 'icon' => '🛤️'],
-            'process_step_resources' => ['name' => 'Step Resources', 'icon' => '🔗'],
-            'process_tasks' => ['name' => 'Process Tasks', 'icon' => '📋']
+            'process_step_resources' => ['name' => 'Step Resources', 'icon' => '🔗']
         ]
     ],
     'resources_management' => [
@@ -128,9 +167,10 @@ $table_configs = [
         'icon' => '🏭',
         'tables' => [
             'resources' => ['name' => 'Resources', 'icon' => '📦'],
+            'enhanced_resources' => ['name' => 'Enhanced Resources', 'icon' => '🚀'],
             'resource_allocations' => ['name' => 'Allocations', 'icon' => '📊'],
             'resource_templates' => ['name' => 'Templates', 'icon' => '📄'],
-            'enhanced_resources' => ['name' => 'Enhanced Resources', 'icon' => '🚀']
+            'task_resource_assignments' => ['name' => 'Task Assignments', 'icon' => '🔗']
         ]
     ],
     'simulation_management' => [
@@ -138,18 +178,29 @@ $table_configs = [
         'icon' => '🎮',
         'tables' => [
             'simulation_configs' => ['name' => 'Configurations', 'icon' => '⚙️'],
-            'simulation_metrics' => ['name' => 'Metrics', 'icon' => '📈'],
             'simulation_resources' => ['name' => 'Sim Resources', 'icon' => '🎯'],
             'simulation_results' => ['name' => 'Results', 'icon' => '📊'],
+            'simulation_metrics' => ['name' => 'Metrics', 'icon' => '📈'],
             'simulation_templates' => ['name' => 'Templates', 'icon' => '📋']
         ]
     ],
-    'timers_activities' => [
-        'title' => 'Timers & Activities Management',
-        'icon' => '⏱️',
+    'analytics_feedback' => [
+        'title' => 'Analytics & Feedback',
+        'icon' => '📈',
         'tables' => [
-            'timer_averages' => ['name' => 'Timer Averages', 'icon' => '⏰'],
+            'metrics' => ['name' => 'Metrics', 'icon' => '📊'],
+            'customer_feedback' => ['name' => 'Customer Feedback', 'icon' => '💬'],
+            'dashboard_metrics_cache' => ['name' => 'Dashboard Cache', 'icon' => '⚡'],
+            'optimization_recommendations' => ['name' => 'Optimization', 'icon' => '🎯']
+        ]
+    ],
+    'timers_training' => [
+        'title' => 'Timers & Training',
+        'icon' => 'ⱱ️',
+        'tables' => [
             'timer_sessions' => ['name' => 'Timer Sessions', 'icon' => '🕐'],
+            'timer_averages' => ['name' => 'Timer Averages', 'icon' => '⏰'],
+            'training_programs' => ['name' => 'Training Programs', 'icon' => '🎓'],
             'activity_log' => ['name' => 'Activity Log', 'icon' => '📝']
         ]
     ]
@@ -278,6 +329,7 @@ $table_configs = [
             cursor: pointer;
             transition: all 0.3s ease;
             text-align: center;
+            position: relative;
         }
 
         .table-card:hover {
@@ -300,6 +352,18 @@ $table_configs = [
             color: #333;
             margin-bottom: 10px;
             font-size: 1.2rem;
+        }
+
+        .record-count {
+            background: #17a2b8;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            position: absolute;
+            top: 10px;
+            right: 10px;
         }
 
         .crud-section {
@@ -385,6 +449,36 @@ $table_configs = [
             background: #c82333;
         }
 
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .search-filter-section {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px;
+            border: 2px solid #e9ecef;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: #ff6b35;
+        }
+
         .data-table {
             background: white;
             border-radius: 8px;
@@ -393,9 +487,17 @@ $table_configs = [
             margin-top: 20px;
         }
 
+        .table-container {
+            max-height: 500px;
+            overflow: auto;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+
         .data-table table {
             width: 100%;
             border-collapse: collapse;
+            min-width: 800px;
         }
 
         .data-table th {
@@ -413,6 +515,7 @@ $table_configs = [
             padding: 12px 10px;
             border-bottom: 1px solid #eee;
             vertical-align: top;
+            word-break: break-word;
         }
 
         .data-table tr:hover {
@@ -423,11 +526,14 @@ $table_configs = [
             background: #fafafa;
         }
 
-        .table-container {
-            max-height: 500px;
-            overflow-y: auto;
-            border: 1px solid #ddd;
-            border-radius: 8px;
+        .action-buttons {
+            display: flex;
+            gap: 5px;
+        }
+
+        .action-buttons .btn {
+            padding: 5px 10px;
+            font-size: 0.8rem;
         }
 
         .form-overlay {
@@ -447,7 +553,7 @@ $table_configs = [
             background: white;
             border-radius: 15px;
             padding: 30px;
-            max-width: 600px;
+            max-width: 700px;
             width: 90%;
             max-height: 80vh;
             overflow-y: auto;
@@ -542,37 +648,62 @@ $table_configs = [
             border-left: 4px solid #28a745;
         }
 
-        .record-count {
-            background: #17a2b8;
-            color: white;
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 600;
-        }
-
-        .action-buttons {
-            display: flex;
-            gap: 5px;
-        }
-
-        .action-buttons .btn {
-            padding: 5px 10px;
-            font-size: 0.8rem;
-        }
-
-        .search-box {
+        .json-preview {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
             padding: 10px;
-            border: 2px solid #e9ecef;
-            border-radius: 6px;
-            margin: 10px 0;
-            width: 300px;
-            font-size: 1rem;
+            font-family: monospace;
+            font-size: 0.9rem;
+            max-height: 200px;
+            overflow-y: auto;
         }
 
-        .search-box:focus {
-            outline: none;
-            border-color: #ff6b35;
+        .field-hint {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .password-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .stats-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-item {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            border: 2px solid #e9ecef;
+        }
+
+        .stat-number {
+            display: block;
+            font-size: 2rem;
+            font-weight: bold;
+            color: #ff6b35;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 5px;
         }
 
         @media (max-width: 768px) {
@@ -601,20 +732,84 @@ $table_configs = [
                 justify-content: center;
             }
 
+            .search-filter-section {
+                flex-direction: column;
+            }
+
             .search-box {
-                width: 100%;
+                min-width: auto;
+            }
+
+            .form-modal {
+                width: 95%;
+                padding: 20px;
             }
         }
 
-        .json-preview {
-            background: #f8f9fa;
+        .table-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .bulk-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .pagination button {
+            padding: 8px 12px;
             border: 1px solid #ddd;
+            background: white;
+            cursor: pointer;
             border-radius: 4px;
-            padding: 10px;
-            font-family: monospace;
-            font-size: 0.9rem;
-            max-height: 200px;
-            overflow-y: auto;
+        }
+
+        .pagination button:hover {
+            background: #f8f9fa;
+        }
+
+        .pagination button.active {
+            background: #ff6b35;
+            color: white;
+            border-color: #ff6b35;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 6px;
+            color: white;
+            font-weight: 500;
+            z-index: 1001;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.success {
+            background: #28a745;
+        }
+
+        .notification.error {
+            background: #dc3545;
         }
     </style>
 </head>
@@ -624,7 +819,7 @@ $table_configs = [
             <h1>🗄️ Database Management</h1>
             <p>Comprehensive CRUD Operations for MACTA Framework</p>
             <div class="connection-status">
-                ✅ Connected to: MACTA Framework Database
+                ✅ Connected to: <?php echo DB_NAME; ?> (<?php echo DB_HOST; ?>)
             </div>
         </div>
 
@@ -651,9 +846,9 @@ $table_configs = [
             <div class="table-grid">
                 <?php foreach ($config['tables'] as $table_name => $table_info): ?>
                 <div class="table-card" data-table="<?= $table_name ?>">
+                    <div class="record-count" id="count-<?= $table_name ?>">Loading...</div>
                     <div class="table-card-icon"><?= $table_info['icon'] ?></div>
                     <h3><?= $table_info['name'] ?></h3>
-                    <div class="record-count" id="count-<?= $table_name ?>">Loading...</div>
                 </div>
                 <?php endforeach; ?>
             </div>
@@ -669,12 +864,20 @@ $table_configs = [
                             🔄 Refresh Data
                         </button>
                         <button class="btn btn-warning" onclick="exportData()">
-                            📤 Export Data
+                            📤 Export CSV
+                        </button>
+                        <button class="btn btn-secondary" onclick="showTableInfo()">
+                            ℹ️ Table Info
                         </button>
                     </div>
                 </div>
 
-                <input type="text" class="search-box" placeholder="Search records..." onkeyup="searchTable()" id="searchInput">
+                <div class="search-filter-section">
+                    <input type="text" class="search-box" placeholder="Search records..." onkeyup="searchTable()" id="searchInput">
+                    <select class="search-box" id="columnFilter" onchange="filterByColumn()" style="flex: 0 0 200px;">
+                        <option value="">All Columns</option>
+                    </select>
+                </div>
 
                 <div class="data-table">
                     <div class="table-container">
@@ -692,6 +895,12 @@ $table_configs = [
                         </table>
                     </div>
                 </div>
+
+                <div class="pagination" id="pagination" style="display: none;">
+                    <button onclick="changePage(-1)">« Previous</button>
+                    <span id="page-info">Page 1 of 1</span>
+                    <button onclick="changePage(1)">Next »</button>
+                </div>
             </div>
         </div>
         <?php endforeach; ?>
@@ -707,29 +916,33 @@ $table_configs = [
                     <!-- Form fields will be dynamically generated -->
                 </div>
                 <div class="btn-group" style="margin-top: 25px; justify-content: flex-end;">
-                    <button type="button" class="btn" onclick="closeForm()" 
-                            style="background: #6c757d; color: white;">Cancel</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeForm()">Cancel</button>
                     <button type="submit" class="btn btn-primary">Save Record</button>
                 </div>
             </form>
         </div>
     </div>
 
+    <!-- Notification -->
+    <div id="notification" class="notification"></div>
+
     <script>
         let currentTable = '';
         let currentData = [];
+        let filteredData = [];
         let tableStructure = [];
         let editingId = null;
+        let currentPage = 1;
+        const recordsPerPage = 50;
 
-        // Tab switching
+        // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM loaded, setting up event listeners...');
+            console.log('DOM loaded, initializing database management...');
             
-            // Tab switching
+            // Setup tab switching
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
                     const tabId = this.dataset.tab;
-                    console.log('Tab clicked:', tabId);
                     
                     // Update tab buttons
                     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -740,56 +953,65 @@ $table_configs = [
                     document.getElementById(tabId).style.display = 'block';
                     
                     // Reset current table selection
-                    currentTable = '';
-                    document.getElementById('crud-section').classList.remove('active');
-                    document.querySelectorAll('.table-card').forEach(card => card.classList.remove('selected'));
+                    resetTableSelection();
                 });
             });
 
-            // Table card selection - attach to all cards
-            document.querySelectorAll('.table-card').forEach(card => {
-                console.log('Attaching click to card:', card.dataset.table);
-                card.addEventListener('click', function() {
-                    const tableName = this.dataset.table;
-                    console.log('Table card clicked:', tableName);
+            // Setup table card clicks using event delegation
+            document.addEventListener('click', function(e) {
+                const tableCard = e.target.closest('.table-card');
+                if (tableCard) {
+                    const tableName = tableCard.dataset.table;
                     selectTable(tableName);
-                });
+                }
             });
 
-            // Load initial counts
+            // Setup form submission
+            document.getElementById('record-form').addEventListener('submit', handleFormSubmission);
+
+            // Load initial record counts
             loadAllRecordCounts();
-            
-            console.log('All event listeners attached successfully!');
         });
 
+        function resetTableSelection() {
+            currentTable = '';
+            document.getElementById('crud-section').classList.remove('active');
+            document.querySelectorAll('.table-card').forEach(card => card.classList.remove('selected'));
+            document.getElementById('table-body').innerHTML = '<tr><td colspan="100%" class="loading">Select a table to view and manage data</td></tr>';
+            document.getElementById('table-head').innerHTML = '';
+            document.getElementById('searchInput').value = '';
+            document.getElementById('columnFilter').innerHTML = '<option value="">All Columns</option>';
+        }
+
         async function loadAllRecordCounts() {
-            const tables = <?= json_encode(array_merge(...array_column($table_configs, 'tables'))) ?>;
+            const allTables = <?php 
+                $allTables = [];
+                foreach($table_configs as $config) {
+                    $allTables = array_merge($allTables, array_keys($config['tables']));
+                }
+                echo json_encode($allTables);
+            ?>;
             
-            for (const [tableName, tableInfo] of Object.entries(tables)) {
+            for (const tableName of allTables) {
                 try {
                     const response = await fetch('', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                         body: new URLSearchParams({
-                            action: 'fetch',
+                            action: 'get_count',
                             table: tableName
                         })
                     });
                     
                     const result = await response.json();
-                    if (result.success) {
-                        const countElement = document.getElementById(`count-${tableName}`);
-                        if (countElement) {
-                            countElement.textContent = `${result.data.length} records`;
-                        }
-                    } else {
-                        // Table doesn't exist - mark as unavailable
-                        const countElement = document.getElementById(`count-${tableName}`);
-                        if (countElement) {
-                            countElement.textContent = 'Table not found';
-                            countElement.style.background = '#dc3545';
-                        }
-                        console.warn(`Table ${tableName} not found:`, result.message);
+                    const countElement = document.getElementById(`count-${tableName}`);
+                    
+                    if (result.success && countElement) {
+                        countElement.textContent = `${result.count} records`;
+                        countElement.style.background = result.count > 0 ? '#17a2b8' : '#6c757d';
+                    } else if (countElement) {
+                        countElement.textContent = 'N/A';
+                        countElement.style.background = '#dc3545';
                     }
                 } catch (error) {
                     console.error(`Error loading count for ${tableName}:`, error);
@@ -804,6 +1026,7 @@ $table_configs = [
 
         async function selectTable(tableName) {
             currentTable = tableName;
+            currentPage = 1;
             
             // Update UI
             document.querySelectorAll('.table-card').forEach(card => card.classList.remove('selected'));
@@ -812,18 +1035,19 @@ $table_configs = [
             document.getElementById('crud-section').classList.add('active');
             document.getElementById('crud-title').textContent = `Managing: ${tableName}`;
             
-            // Clear search
+            // Clear search and filters
             document.getElementById('searchInput').value = '';
+            document.getElementById('columnFilter').value = '';
             
-            // Show loading message
-            document.getElementById('table-body').innerHTML = '<tr><td colspan="100%" class="loading">Loading table structure...</td></tr>';
+            // Show loading
+            document.getElementById('table-body').innerHTML = '<tr><td colspan="100%" class="loading">Loading table structure and data...</td></tr>';
             
             try {
-                // Load table structure and data
                 await loadTableStructure();
                 await loadTableData();
+                setupColumnFilter();
             } catch (error) {
-                showMessage('Error loading table: ' + error.message, 'error');
+                showNotification('Error loading table: ' + error.message, 'error');
                 console.error('Table selection error:', error);
             }
         }
@@ -842,14 +1066,11 @@ $table_configs = [
                 const result = await response.json();
                 if (result.success) {
                     tableStructure = result.structure;
-                    console.log('Table structure loaded for:', currentTable, tableStructure);
                 } else {
-                    showMessage('Error loading table structure: ' + result.message, 'error');
-                    console.error('Structure error:', result.message);
+                    throw new Error(result.message);
                 }
             } catch (error) {
-                showMessage('Error loading table structure: ' + error.message, 'error');
-                console.error('Structure fetch error:', error);
+                throw new Error('Failed to load table structure: ' + error.message);
             }
         }
 
@@ -867,57 +1088,84 @@ $table_configs = [
                 });
                 
                 const result = await response.json();
-                console.log('Data fetch result for', currentTable, ':', result);
                 
                 if (result.success) {
                     currentData = result.data;
+                    filteredData = [...currentData];
                     renderTable();
+                    setupPagination();
                     
                     // Update record count
                     const countElement = document.getElementById(`count-${currentTable}`);
                     if (countElement) {
                         countElement.textContent = `${result.data.length} records`;
-                        countElement.style.background = '#17a2b8'; // Reset to normal color
+                        countElement.style.background = result.data.length > 0 ? '#17a2b8' : '#6c757d';
                     }
                 } else {
-                    showMessage('Error loading data: ' + result.message, 'error');
-                    document.getElementById('table-body').innerHTML = '<tr><td colspan="100%" class="loading">Error loading data: ' + result.message + '</td></tr>';
+                    throw new Error(result.message);
                 }
             } catch (error) {
-                showMessage('Error loading data: ' + error.message, 'error');
-                console.error('Data fetch error:', error);
-                document.getElementById('table-body').innerHTML = '<tr><td colspan="100%" class="loading">Error: ' + error.message + '</td></tr>';
+                document.getElementById('table-body').innerHTML = `<tr><td colspan="100%" class="loading">Error: ${error.message}</td></tr>`;
+                throw error;
+            }
+        }
+
+        function setupColumnFilter() {
+            const select = document.getElementById('columnFilter');
+            select.innerHTML = '<option value="">All Columns</option>';
+            
+            if (currentData.length > 0) {
+                const columns = Object.keys(currentData[0]);
+                columns.forEach(column => {
+                    const option = document.createElement('option');
+                    option.value = column;
+                    option.textContent = column.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    select.appendChild(option);
+                });
             }
         }
 
         function renderTable() {
-            if (currentData.length === 0) {
+            if (filteredData.length === 0) {
                 document.getElementById('table-head').innerHTML = '';
                 document.getElementById('table-body').innerHTML = '<tr><td colspan="100%" class="loading">No data found</td></tr>';
                 return;
             }
 
-            // Generate table headers
-            const headers = Object.keys(currentData[0]);
-            const headerHtml = headers.map(header => `<th>${header}</th>`).join('') + '<th>Actions</th>';
+            // Calculate pagination
+            const startIndex = (currentPage - 1) * recordsPerPage;
+            const endIndex = Math.min(startIndex + recordsPerPage, filteredData.length);
+            const pageData = filteredData.slice(startIndex, endIndex);
+
+            // Generate headers
+            const headers = Object.keys(filteredData[0]);
+            const headerHtml = headers.map(header => 
+                `<th style="cursor: pointer;" onclick="sortByColumn('${header}')">${header}</th>`
+            ).join('') + '<th>Actions</th>';
             document.getElementById('table-head').innerHTML = headerHtml;
 
-            // Generate table rows
-            const rowsHtml = currentData.map(row => {
+            // Generate rows
+            const rowsHtml = pageData.map(row => {
                 const cellsHtml = headers.map(header => {
                     let value = row[header];
-                    if (value === null) value = '<em>NULL</em>';
-                    else if (header === 'password') value = '<em>***encrypted***</em>'; // Hide password
-                    else if (typeof value === 'object') value = '<div class="json-preview">' + JSON.stringify(value, null, 2) + '</div>';
-                    else if (String(value).length > 100) value = String(value).substring(0, 100) + '...';
+                    if (value === null) {
+                        value = '<em style="color: #999;">NULL</em>';
+                    } else if (header === 'password') {
+                        value = '<em style="color: #666;">***encrypted***</em>';
+                    } else if (typeof value === 'object') {
+                        value = `<div class="json-preview">${JSON.stringify(value, null, 2)}</div>`;
+                    } else if (String(value).length > 100) {
+                        const fullValue = String(value);
+                        value = `<span title="${fullValue.replace(/"/g, '&quot;')}">${fullValue.substring(0, 100)}...</span>`;
+                    }
                     return `<td>${value}</td>`;
                 }).join('');
                 
                 const actionsHtml = `
                     <td>
                         <div class="action-buttons">
-                            <button class="btn btn-warning" onclick="editRecord(${row.id})">✏️ Edit</button>
-                            <button class="btn btn-danger" onclick="deleteRecord(${row.id})">🗑️ Delete</button>
+                            <button class="btn btn-warning" onclick="editRecord(${row.id})" title="Edit">✏️</button>
+                            <button class="btn btn-danger" onclick="deleteRecord(${row.id})" title="Delete">🗑️</button>
                         </div>
                     </td>
                 `;
@@ -928,18 +1176,86 @@ $table_configs = [
             document.getElementById('table-body').innerHTML = rowsHtml;
         }
 
-        function searchTable() {
-            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-            const tableRows = document.querySelectorAll('#table-body tr');
+        function setupPagination() {
+            const totalPages = Math.ceil(filteredData.length / recordsPerPage);
+            const paginationElement = document.getElementById('pagination');
             
-            tableRows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                if (text.includes(searchTerm)) {
-                    row.style.display = '';
+            if (totalPages <= 1) {
+                paginationElement.style.display = 'none';
+                return;
+            }
+
+            paginationElement.style.display = 'flex';
+            document.getElementById('page-info').textContent = `Page ${currentPage} of ${totalPages} (${filteredData.length} records)`;
+        }
+
+        function changePage(direction) {
+            const totalPages = Math.ceil(filteredData.length / recordsPerPage);
+            const newPage = currentPage + direction;
+            
+            if (newPage >= 1 && newPage <= totalPages) {
+                currentPage = newPage;
+                renderTable();
+                setupPagination();
+            }
+        }
+
+        function sortByColumn(column) {
+            const isAsc = filteredData[0] && filteredData[1] && filteredData[0][column] <= filteredData[1][column];
+            
+            filteredData.sort((a, b) => {
+                let aVal = a[column];
+                let bVal = b[column];
+                
+                // Handle null values
+                if (aVal === null && bVal === null) return 0;
+                if (aVal === null) return isAsc ? -1 : 1;
+                if (bVal === null) return isAsc ? 1 : -1;
+                
+                // Handle different data types
+                if (typeof aVal === 'string') {
+                    aVal = aVal.toLowerCase();
+                    bVal = bVal.toLowerCase();
+                }
+                
+                if (isAsc) {
+                    return aVal > bVal ? -1 : aVal < bVal ? 1 : 0;
                 } else {
-                    row.style.display = 'none';
+                    return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
                 }
             });
+            
+            currentPage = 1;
+            renderTable();
+            setupPagination();
+        }
+
+        function searchTable() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const columnFilter = document.getElementById('columnFilter').value;
+            
+            if (!searchTerm && !columnFilter) {
+                filteredData = [...currentData];
+            } else {
+                filteredData = currentData.filter(row => {
+                    const searchMatch = !searchTerm || Object.values(row).some(value => 
+                        value !== null && String(value).toLowerCase().includes(searchTerm)
+                    );
+                    
+                    const columnMatch = !columnFilter || (row[columnFilter] !== null && 
+                        String(row[columnFilter]).toLowerCase().includes(searchTerm || ''));
+                    
+                    return columnFilter ? columnMatch : searchMatch;
+                });
+            }
+            
+            currentPage = 1;
+            renderTable();
+            setupPagination();
+        }
+
+        function filterByColumn() {
+            searchTable(); // Reuse search logic
         }
 
         function showCreateForm() {
@@ -962,8 +1278,9 @@ $table_configs = [
             formFields.innerHTML = '';
 
             tableStructure.forEach((field, index) => {
+                // Skip auto-generated fields
                 if (field.Field === 'id' || field.Field.includes('created_at') || field.Field.includes('updated_at')) {
-                    return; // Skip auto-generated fields
+                    return;
                 }
 
                 const fieldDiv = document.createElement('div');
@@ -972,109 +1289,123 @@ $table_configs = [
                 const label = document.createElement('label');
                 label.textContent = field.Field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                 
-                // Create unique IDs to avoid duplicates
                 const uniqueId = `field_${field.Field}_${index}_${Date.now()}`;
                 label.setAttribute('for', uniqueId);
 
                 let input;
                 const fieldType = field.Type.toLowerCase();
-                const isRequired = field.Null === 'NO';
+                const isRequired = field.Null === 'NO' && !field.Default;
 
-                // Special handling for password fields
+                // Handle password fields
                 if (field.Field === 'password') {
                     if (record) {
-                        // Editing existing user - show password change option
-                        const passwordContainer = document.createElement('div');
+                        const container = document.createElement('div');
                         
-                        const changePasswordCheckbox = document.createElement('input');
-                        changePasswordCheckbox.type = 'checkbox';
-                        changePasswordCheckbox.id = `change_password_${Date.now()}`;
-                        changePasswordCheckbox.style.marginRight = '8px';
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.id = `change_password_${Date.now()}`;
                         
                         const checkboxLabel = document.createElement('label');
-                        checkboxLabel.textContent = 'Change Password';
-                        checkboxLabel.style.fontWeight = 'normal';
-                        checkboxLabel.style.cursor = 'pointer';
-                        checkboxLabel.setAttribute('for', changePasswordCheckbox.id);
-                        checkboxLabel.prepend(changePasswordCheckbox);
+                        checkboxLabel.className = 'checkbox-wrapper';
+                        checkboxLabel.innerHTML = `<input type="checkbox" id="${checkbox.id}"> Change Password`;
                         
                         const passwordInput = document.createElement('input');
                         passwordInput.type = 'password';
                         passwordInput.name = field.Field;
                         passwordInput.id = uniqueId;
-                        passwordInput.placeholder = 'Enter new password (leave blank to keep current)';
-                        passwordInput.style.marginTop = '8px';
+                        passwordInput.placeholder = 'Enter new password';
                         passwordInput.disabled = true;
                         
-                        changePasswordCheckbox.addEventListener('change', function() {
+                        checkboxLabel.querySelector('input').addEventListener('change', function() {
                             passwordInput.disabled = !this.checked;
-                            if (!this.checked) {
-                                passwordInput.value = '';
-                            }
+                            passwordInput.value = '';
                         });
                         
-                        passwordContainer.appendChild(checkboxLabel);
-                        passwordContainer.appendChild(passwordInput);
+                        container.appendChild(checkboxLabel);
+                        container.appendChild(passwordInput);
                         fieldDiv.appendChild(label);
-                        fieldDiv.appendChild(passwordContainer);
+                        fieldDiv.appendChild(container);
                         formFields.appendChild(fieldDiv);
                         return;
                     } else {
-                        // Creating new user - require password
                         input = document.createElement('input');
                         input.type = 'password';
                         input.placeholder = 'Enter password';
                         input.required = true;
                     }
-                } else if (fieldType.includes('text') || fieldType.includes('json')) {
+                }
+                // Handle JSON fields
+                else if (fieldType.includes('json') || ['model_data', 'config_data', 'scenario_data', 'results_data', 'template_data', 'performance_metrics', 'modules', 'path_data', 'bottleneck_tasks', 'optimization_suggestions', 'expected_impact', 'complexity_distribution', 'seasonal_factors'].includes(field.Field)) {
+                    input = document.createElement('textarea');
+                    input.rows = 5;
+                    input.placeholder = 'Enter valid JSON (e.g., {"key": "value"})';
+                    
+                    const hint = document.createElement('div');
+                    hint.className = 'field-hint';
+                    hint.textContent = 'Enter valid JSON format';
+                    fieldDiv.appendChild(hint);
+                }
+                // Handle long text fields
+                else if (fieldType.includes('text') || fieldType.includes('longtext')) {
                     input = document.createElement('textarea');
                     input.rows = 3;
-                } else if (fieldType.includes('enum')) {
+                }
+                // Handle enum fields
+                else if (fieldType.includes('enum')) {
                     input = document.createElement('select');
-                    const enumValues = field.Type.match(/enum\((.*)\)/)[1].split(',').map(v => v.replace(/'/g, ''));
-                    input.innerHTML = '<option value="">Select an option</option>' + 
-                        enumValues.map(val => `<option value="${val}">${val}</option>`).join('');
-                } else if (fieldType.includes('date')) {
+                    const enumMatch = field.Type.match(/enum\((.*)\)/);
+                    if (enumMatch) {
+                        const enumValues = enumMatch[1].split(',').map(v => v.replace(/'/g, '').trim());
+                        input.innerHTML = '<option value="">Select an option</option>' + 
+                            enumValues.map(val => `<option value="${val}">${val}</option>`).join('');
+                    }
+                }
+                // Handle date/time fields
+                else if (fieldType.includes('date') && !fieldType.includes('time')) {
                     input = document.createElement('input');
                     input.type = 'date';
-                } else if (fieldType.includes('time')) {
+                }
+                else if (fieldType.includes('time') && !fieldType.includes('date')) {
                     input = document.createElement('input');
                     input.type = 'time';
-                } else if (fieldType.includes('datetime') || fieldType.includes('timestamp')) {
+                }
+                else if (fieldType.includes('datetime') || fieldType.includes('timestamp')) {
                     input = document.createElement('input');
                     input.type = 'datetime-local';
-                } else if (fieldType.includes('int') || fieldType.includes('decimal')) {
+                }
+                // Handle numeric fields
+                else if (fieldType.includes('int') || fieldType.includes('decimal')) {
                     input = document.createElement('input');
                     input.type = 'number';
                     if (fieldType.includes('decimal')) {
                         input.step = '0.01';
                     }
-                } else {
+                }
+                // Default to text
+                else {
                     input = document.createElement('input');
                     input.type = 'text';
                 }
 
                 input.name = field.Field;
                 input.id = uniqueId;
-                if (isRequired && !field.Default && field.Field !== 'password') {
+                
+                if (isRequired && field.Field !== 'password') {
                     input.required = true;
                 }
 
-                // Set default values (skip password field as it's handled above)
-                if (field.Field !== 'password') {
-                    if (record && record[field.Field] !== null) {
-                        if (input.type === 'datetime-local' && record[field.Field]) {
-                            // Convert MySQL datetime to HTML datetime-local format
-                            const date = new Date(record[field.Field]);
-                            input.value = date.toISOString().slice(0, 16);
-                        } else if (fieldType.includes('json') && typeof record[field.Field] === 'object') {
-                            input.value = JSON.stringify(record[field.Field], null, 2);
-                        } else {
-                            input.value = record[field.Field];
-                        }
-                    } else if (field.Default && field.Default !== 'NULL') {
-                        input.value = field.Default.replace(/'/g, '');
+                // Set values for existing records
+                if (field.Field !== 'password' && record && record[field.Field] !== null) {
+                    if (input.type === 'datetime-local' && record[field.Field]) {
+                        const date = new Date(record[field.Field]);
+                        input.value = date.toISOString().slice(0, 16);
+                    } else if (fieldType.includes('json') && typeof record[field.Field] === 'object') {
+                        input.value = JSON.stringify(record[field.Field], null, 2);
+                    } else {
+                        input.value = record[field.Field];
                     }
+                } else if (field.Default && field.Default !== 'NULL') {
+                    input.value = field.Default.replace(/'/g, '');
                 }
 
                 fieldDiv.appendChild(label);
@@ -1083,38 +1414,35 @@ $table_configs = [
             });
         }
 
-        function closeForm() {
-            document.getElementById('form-overlay').style.display = 'none';
-            document.getElementById('record-form').reset();
-            editingId = null;
-        }
-
-        // Form submission
-        document.getElementById('record-form').addEventListener('submit', async function(e) {
+        async function handleFormSubmission(e) {
             e.preventDefault();
             
-            const formData = new FormData(this);
+            const formData = new FormData(e.target);
             const data = {};
             
+            // Process form data
             for (let [key, value] of formData.entries()) {
                 // Handle JSON fields
-                const field = tableStructure.find(f => f.Field === key);
-                if (field && field.Type.toLowerCase().includes('json')) {
-                    try {
-                        data[key] = value ? JSON.parse(value) : null;
-                    } catch (error) {
-                        showMessage(`Invalid JSON in field ${key}: ${error.message}`, 'error');
-                        return;
+                if (['model_data', 'config_data', 'scenario_data', 'results_data', 'template_data', 'performance_metrics', 'modules', 'path_data', 'bottleneck_tasks', 'optimization_suggestions', 'expected_impact', 'complexity_distribution', 'seasonal_factors'].includes(key)) {
+                    if (value) {
+                        try {
+                            JSON.parse(value); // Validate JSON
+                            data[key] = value;
+                        } catch (error) {
+                            showNotification(`Invalid JSON in field ${key}: ${error.message}`, 'error');
+                            return;
+                        }
+                    } else {
+                        data[key] = null;
                     }
                 } else if (key === 'password' && value) {
-                    // Hash password if provided
-                    data[key] = 'HASH:' + value; // We'll handle this server-side
+                    data[key] = 'HASH:' + value;
                 } else {
                     data[key] = value || null;
                 }
             }
 
-            // For password updates, only include password if checkbox is checked
+            // Handle password updates
             if (editingId && currentTable === 'users') {
                 const changePasswordCheckbox = document.querySelector('input[type="checkbox"][id^="change_password_"]');
                 if (changePasswordCheckbox && !changePasswordCheckbox.checked) {
@@ -1137,16 +1465,17 @@ $table_configs = [
 
                 const result = await response.json();
                 if (result.success) {
-                    showMessage(result.message, 'success');
+                    showNotification(result.message, 'success');
                     closeForm();
                     await loadTableData();
+                    await loadAllRecordCounts();
                 } else {
-                    showMessage('Error: ' + result.message, 'error');
+                    showNotification('Error: ' + result.message, 'error');
                 }
             } catch (error) {
-                showMessage('Error: ' + error.message, 'error');
+                showNotification('Error: ' + error.message, 'error');
             }
-        });
+        }
 
         async function deleteRecord(id) {
             if (!confirm('Are you sure you want to delete this record? This action cannot be undone.')) {
@@ -1166,45 +1495,45 @@ $table_configs = [
 
                 const result = await response.json();
                 if (result.success) {
-                    showMessage(result.message, 'success');
+                    showNotification(result.message, 'success');
                     await loadTableData();
+                    await loadAllRecordCounts();
                 } else {
-                    showMessage('Error: ' + result.message, 'error');
+                    showNotification('Error: ' + result.message, 'error');
                 }
             } catch (error) {
-                showMessage('Error: ' + error.message, 'error');
+                showNotification('Error: ' + error.message, 'error');
             }
         }
 
         async function refreshData() {
             if (currentTable) {
                 await loadTableData();
-                showMessage('Data refreshed successfully', 'success');
+                await loadAllRecordCounts();
+                showNotification('Data refreshed successfully', 'success');
             }
         }
 
         function exportData() {
-            if (currentData.length === 0) {
-                showMessage('No data to export', 'error');
+            if (filteredData.length === 0) {
+                showNotification('No data to export', 'error');
                 return;
             }
 
-            // Convert data to CSV
-            const headers = Object.keys(currentData[0]);
+            const headers = Object.keys(filteredData[0]);
             const csvContent = [
                 headers.join(','),
-                ...currentData.map(row => 
+                ...filteredData.map(row => 
                     headers.map(header => {
                         let value = row[header];
                         if (value === null) value = '';
                         else if (typeof value === 'object') value = JSON.stringify(value);
-                        else value = String(value).replace(/"/g, '""'); // Escape quotes
+                        else value = String(value).replace(/"/g, '""');
                         return `"${value}"`;
                     }).join(',')
                 )
             ].join('\n');
 
-            // Download CSV file
             const blob = new Blob([csvContent], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -1215,27 +1544,61 @@ $table_configs = [
             document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
 
-            showMessage(`Data exported successfully as ${a.download}`, 'success');
+            showNotification(`Data exported as ${a.download}`, 'success');
         }
 
-        function showMessage(message, type) {
-            // Remove existing messages
-            document.querySelectorAll('.error-message, .success-message').forEach(el => el.remove());
+        function showTableInfo() {
+            if (!currentTable || !tableStructure.length) {
+                showNotification('Please select a table first', 'error');
+                return;
+            }
 
-            const messageDiv = document.createElement('div');
-            messageDiv.className = type === 'error' ? 'error-message' : 'success-message';
-            messageDiv.textContent = message;
+            let infoHtml = `<h3>Table Structure: ${currentTable}</h3><div style="max-height: 400px; overflow-y: auto;">`;
+            infoHtml += '<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">';
+            infoHtml += '<tr style="background: #f8f9fa;"><th style="padding: 8px; border: 1px solid #ddd;">Field</th><th style="padding: 8px; border: 1px solid #ddd;">Type</th><th style="padding: 8px; border: 1px solid #ddd;">Null</th><th style="padding: 8px; border: 1px solid #ddd;">Key</th><th style="padding: 8px; border: 1px solid #ddd;">Default</th></tr>';
+            
+            tableStructure.forEach(field => {
+                infoHtml += `<tr>
+                    <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">${field.Field}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">${field.Type}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">${field.Null}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">${field.Key}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">${field.Default || 'None'}</td>
+                </tr>`;
+            });
+            
+            infoHtml += '</table></div>';
+            
+            const modal = document.createElement('div');
+            modal.className = 'form-overlay';
+            modal.style.display = 'flex';
+            modal.innerHTML = `
+                <div class="form-modal">
+                    <button class="close-btn" onclick="this.closest('.form-overlay').remove()">×</button>
+                    ${infoHtml}
+                    <div style="text-align: center; margin-top: 20px;">
+                        <button class="btn btn-secondary" onclick="this.closest('.form-overlay').remove()">Close</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
 
-            // Insert message at the top of crud section
-            const crudSection = document.getElementById('crud-section');
-            crudSection.insertBefore(messageDiv, crudSection.firstChild);
+        function closeForm() {
+            document.getElementById('form-overlay').style.display = 'none';
+            document.getElementById('record-form').reset();
+            editingId = null;
+        }
 
-            // Auto-remove message after 5 seconds
+        function showNotification(message, type) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.classList.add('show');
+
             setTimeout(() => {
-                if (messageDiv.parentNode) {
-                    messageDiv.remove();
-                }
-            }, 5000);
+                notification.classList.remove('show');
+            }, 3000);
         }
 
         // Keyboard shortcuts
@@ -1261,17 +1624,8 @@ $table_configs = [
             }
         });
 
-        // Auto-refresh data every 30 seconds
-        setInterval(() => {
-            if (currentTable) {
-                loadTableData();
-            }
-            loadAllRecordCounts();
-        }, 30000);
-
-        // Show loading message on page load
-        console.log('MACTA Database Management script loaded!');
-        console.log('Connected to MACTA Framework Database');
+        console.log('MACTA Database Management System loaded successfully!');
     </script>
 </body>
 </html>
+        

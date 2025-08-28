@@ -1,5 +1,5 @@
 <?php
-// modules/M/index.php - Master Page for Enhanced MACTA Modeling Module
+// modules/M/index.php - Fixed Master Page for MACTA Modeling Module
 
 // Initialize variables
 $processes = [];
@@ -49,6 +49,40 @@ $validTabs = ['design', 'view', 'resources', 'simulation', 'analysis'];
 if (!in_array($currentTab, $validTabs)) {
     $currentTab = 'design';
 }
+
+// Handle AJAX requests for tab content
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'load_tab') {
+    $tabToLoad = $_GET['tab_name'] ?? 'design';
+    
+    if (!in_array($tabToLoad, $validTabs)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid tab name']);
+        exit;
+    }
+    
+    // Check if the tab file exists
+    $tabFile = __DIR__ . '/' . $tabToLoad . '.php';
+    if (!file_exists($tabFile)) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Tab file not found: ' . $tabToLoad . '.php']);
+        exit;
+    }
+    
+    // Capture the output of the tab file
+    ob_start();
+    include $tabFile;
+    $tabContent = ob_get_clean();
+    
+    echo json_encode([
+        'success' => true,
+        'content' => $tabContent,
+        'tab_name' => $tabToLoad,
+        'processes' => $processes,
+        'projects' => $projects,
+        'db_error' => $db_error
+    ]);
+    exit;
+}
 ?>
 
 <!DOCTYPE html>
@@ -56,7 +90,7 @@ if (!in_array($currentTab, $validTabs)) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MACTA Framework - Enhanced Modeling Module</title>
+    <title>MACTA Framework - Modeling Module</title>
 
     <!-- MACTA Brand Colors and Enhanced Styling -->
     <style>
@@ -216,6 +250,31 @@ if (!in_array($currentTab, $validTabs)) {
             height: 400px;
             font-size: 18px;
             color: var(--macta-orange);
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--htt-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: #ffebee;
+            border: 1px solid #e57373;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            color: #c62828;
         }
 
         /* Responsive Design */
@@ -242,7 +301,7 @@ if (!in_array($currentTab, $validTabs)) {
         <div class="header">
             <h1>
                 <div class="macta-logo">M</div>
-                MACTA Framework - Enhanced Modeling Module
+                MACTA Framework - Modeling Module
             </h1>
             <div>
                 <a href="../../index.php" class="btn btn-secondary">
@@ -253,37 +312,40 @@ if (!in_array($currentTab, $validTabs)) {
 
         <!-- Navigation Tabs -->
         <div class="nav-tabs">
-            <a href="?tab=design" class="nav-tab <?= $currentTab === 'design' ? 'active' : '' ?>">
+            <button class="nav-tab <?= $currentTab === 'design' ? 'active' : '' ?>" onclick="loadTab('design')" data-tab="design">
                 <span class="tab-icon">🎨</span>
                 <span>BPMN Design</span>
-            </a>
-            <a href="?tab=view" class="nav-tab <?= $currentTab === 'view' ? 'active' : '' ?>">
+            </button>
+            <button class="nav-tab <?= $currentTab === 'view' ? 'active' : '' ?>" onclick="loadTab('view')" data-tab="view">
                 <span class="tab-icon">👁️</span>
                 <span>BPMN View</span>
-            </a>
-            <a href="?tab=resources" class="nav-tab <?= $currentTab === 'resources' ? 'active' : '' ?>">
+            </button>
+            <button class="nav-tab <?= $currentTab === 'resources' ? 'active' : '' ?>" onclick="loadTab('resources')" data-tab="resources">
                 <span class="tab-icon">👥</span>
                 <span>Resource Assignment</span>
-            </a>
-            <a href="?tab=simulation" class="nav-tab <?= $currentTab === 'simulation' ? 'active' : '' ?>">
+            </button>
+            <button class="nav-tab <?= $currentTab === 'simulation' ? 'active' : '' ?>" onclick="loadTab('simulation')" data-tab="simulation">
                 <span class="tab-icon">⚡</span>
                 <span>Simulation</span>
-            </a>
-            <a href="?tab=analysis" class="nav-tab <?= $currentTab === 'analysis' ? 'active' : '' ?>">
+            </button>
+            <button class="nav-tab <?= $currentTab === 'analysis' ? 'active' : '' ?>" onclick="loadTab('analysis')" data-tab="analysis">
                 <span class="tab-icon">📊</span>
                 <span>Path Analysis</span>
-            </a>
+            </button>
         </div>
 
         <!-- Tab Content Area -->
         <div class="tab-content" id="tab-content-area">
             <?php if (!empty($db_error)): ?>
-                <div style="background: #ffebee; border: 1px solid #e57373; border-radius: 8px; padding: 20px; margin-bottom: 20px; color: #c62828;">
+                <div class="error-message">
                     <strong>Database Error:</strong> <?= htmlspecialchars($db_error) ?>
                 </div>
             <?php endif; ?>
 
-            <div class="loading">Loading <?= ucfirst($currentTab) ?> module...</div>
+            <div class="loading">
+                <div class="loading-spinner"></div>
+                <div>Loading <?= ucfirst($currentTab) ?> module...</div>
+            </div>
         </div>
     </div>
 
@@ -292,66 +354,202 @@ if (!in_array($currentTab, $validTabs)) {
         const processes = <?= json_encode($processes) ?>;
         const projects = <?= json_encode($projects) ?>;
         const dbError = <?= json_encode($db_error) ?>;
-        const currentTab = '<?= $currentTab ?>';
+        let currentTab = '<?= $currentTab ?>';
         
         // Load the appropriate sub-page content
         document.addEventListener('DOMContentLoaded', function() {
-            loadTabContent(currentTab);
+            console.log('MACTA Modeling Master Page Initialized');
+            console.log('Current Tab:', currentTab);
+            console.log('Available Processes:', processes.length);
+            
+            // Load initial tab content
+            loadTab(currentTab);
         });
 
-        function loadTabContent(tabName) {
+        // Load tab content via AJAX
+        function loadTab(tabName) {
+            if (!tabName) return;
+            
+            console.log('Loading tab:', tabName);
+            
             const contentArea = document.getElementById('tab-content-area');
+            const tabs = document.querySelectorAll('.nav-tab');
+            
+            // Update active tab styling
+            tabs.forEach(tab => {
+                tab.classList.remove('active');
+                if (tab.dataset.tab === tabName) {
+                    tab.classList.add('active');
+                }
+            });
             
             // Show loading
-            contentArea.innerHTML = `<div class="loading">Loading ${tabName.charAt(0).toUpperCase() + tabName.slice(1)} module...</div>`;
+            contentArea.innerHTML = `
+                <div class="loading">
+                    <div class="loading-spinner"></div>
+                    <div>Loading ${tabName.charAt(0).toUpperCase() + tabName.slice(1)} module...</div>
+                </div>
+            `;
             
-            // Load the sub-page content via fetch
-            fetch(`${tabName}.php`)
+            // Load the tab content via AJAX
+            fetch(`?ajax=load_tab&tab_name=${tabName}`)
                 .then(response => {
                     if (!response.ok) {
-                        throw new Error('Network response was not ok');
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                     }
-                    return response.text();
+                    return response.json();
                 })
-                .then(html => {
-                    contentArea.innerHTML = html;
-                    
-                    // Initialize any scripts needed for the loaded content
-                    initializeTabScripts(tabName);
+                .then(data => {
+                    if (data.success) {
+                        contentArea.innerHTML = data.content;
+                        currentTab = tabName;
+                        
+                        // Update URL without page reload
+                        const newUrl = new URL(window.location);
+                        newUrl.searchParams.set('tab', tabName);
+                        window.history.pushState({tab: tabName}, '', newUrl);
+                        
+                        // Initialize scripts for the loaded content
+                        initializeTabScripts(tabName, data);
+                    } else {
+                        throw new Error(data.error || 'Failed to load tab content');
+                    }
                 })
                 .catch(error => {
                     console.error('Error loading tab content:', error);
                     contentArea.innerHTML = `
                         <div style="text-align: center; padding: 40px; color: #d63031;">
-                            <h3>❌ Failed to load ${tabName} module</h3>
-                            <p>Error: ${error.message}</p>
-                            <p>Please check if the file <code>${tabName}.php</code> exists in the modules/M directory.</p>
+                            <h3>⚠️ Failed to load ${tabName} module</h3>
+                            <p><strong>Error:</strong> ${error.message}</p>
+                            <p>Please check if the file <code>${tabName}.php</code> exists and is accessible.</p>
+                            <button class="btn btn-secondary" onclick="loadTab('${tabName}')">
+                                <span>🔄</span> Retry
+                            </button>
                         </div>
                     `;
                 });
         }
 
-        function initializeTabScripts(tabName) {
-            // This function will be called after content is loaded
-            // Each sub-page will have its own initialization script
-            
+        // Initialize scripts for loaded tab content
+        function initializeTabScripts(tabName, data) {
             console.log(`Initializing scripts for ${tabName} tab`);
             
-            // Dispatch a custom event that sub-pages can listen to
+            // First, dispatch the event so sub-pages know content is loaded
             const event = new CustomEvent('tabContentLoaded', {
                 detail: { 
                     tabName: tabName,
-                    processes: processes,
-                    projects: projects,
-                    dbError: dbError
+                    processes: data.processes || processes,
+                    projects: data.projects || projects,
+                    dbError: data.db_error || dbError
                 }
             });
             document.dispatchEvent(event);
+            
+            // Wait a bit for DOM to be ready, then execute scripts
+            setTimeout(() => {
+                // Execute any inline scripts in the loaded content
+                const scripts = document.querySelectorAll('#tab-content-area script:not([src])');
+                scripts.forEach(script => {
+                    try {
+                        // Create a new script element and execute it
+                        const newScript = document.createElement('script');
+                        newScript.textContent = script.textContent;
+                        document.body.appendChild(newScript);
+                        document.body.removeChild(newScript);
+                    } catch (error) {
+                        console.error('Error executing script:', error);
+                    }
+                });
+                
+                // Handle external scripts (like BPMN.js)
+                const externalScripts = document.querySelectorAll('#tab-content-area script[src]');
+                let scriptsLoaded = 0;
+                const totalScripts = externalScripts.length;
+                
+                if (totalScripts === 0) {
+                    // No external scripts, trigger final initialization
+                    finalizeTabInitialization(tabName, data);
+                } else {
+                    externalScripts.forEach(script => {
+                        const newScript = document.createElement('script');
+                        newScript.src = script.src;
+                        newScript.onload = function() {
+                            scriptsLoaded++;
+                            console.log(`External script loaded: ${script.src} (${scriptsLoaded}/${totalScripts})`);
+                            
+                            if (scriptsLoaded === totalScripts) {
+                                // All external scripts loaded, trigger final initialization
+                                setTimeout(() => {
+                                    finalizeTabInitialization(tabName, data);
+                                }, 200);
+                            }
+                        };
+                        newScript.onerror = function() {
+                            console.error(`Failed to load external script: ${script.src}`);
+                            scriptsLoaded++;
+                            if (scriptsLoaded === totalScripts) {
+                                setTimeout(() => {
+                                    finalizeTabInitialization(tabName, data);
+                                }, 200);
+                            }
+                        };
+                        document.head.appendChild(newScript);
+                    });
+                }
+                
+            }, 100);
+            
+            console.log(`${tabName} tab initialization started`);
+        }
+        
+        // Finalize tab initialization after all scripts are loaded
+        function finalizeTabInitialization(tabName, data) {
+            console.log(`Finalizing initialization for ${tabName} tab`);
+            
+            // Trigger DOMContentLoaded-like event for the loaded content
+            const finalEvent = new CustomEvent('tabScriptsReady', {
+                detail: { 
+                    tabName: tabName,
+                    processes: data.processes || processes,
+                    projects: data.projects || projects,
+                    dbError: data.db_error || dbError
+                }
+            });
+            document.dispatchEvent(finalEvent);
+            
+            // Tab-specific initialization
+            if (tabName === 'design') {
+                // Force initialization of BPMN designer if it exists
+                setTimeout(() => {
+                    if (typeof initializeBpmnDesigner === 'function') {
+                        console.log('Manually initializing BPMN designer...');
+                        initializeBpmnDesigner();
+                    }
+                }, 500);
+            } else if (tabName === 'view') {
+                // Force initialization of BPMN viewer if it exists
+                setTimeout(() => {
+                    if (typeof initializeBpmnViewer === 'function') {
+                        console.log('Manually initializing BPMN viewer...');
+                        initializeBpmnViewer();
+                    }
+                }, 500);
+            }
+            
+            console.log(`${tabName} tab fully initialized`);
         }
 
-        console.log('🎯 MACTA Enhanced Modeling Master Page Initialized');
-        console.log('📋 Current Tab:', currentTab);
-        console.log('📊 Available Processes:', processes.length);
+        // Handle browser back/forward buttons
+        window.addEventListener('popstate', function(event) {
+            if (event.state && event.state.tab) {
+                loadTab(event.state.tab);
+            }
+        });
+
+        // Global function to switch tabs (can be called from sub-pages)
+        window.switchToTab = function(tabName) {
+            loadTab(tabName);
+        };
     </script>
 </body>
 </html>

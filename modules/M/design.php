@@ -539,10 +539,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         let currentProjectId = null;
         let currentProcessName = '';
 
-        // Get data from PHP
-        const processes = <?= json_encode($processes) ?>;
-        const projects = <?= json_encode($projects) ?>;
-        const dbError = <?= json_encode($db_error) ?>;
+        // Get data from PHP - Updated for AJAX context
+        let processes = <?= json_encode($processes) ?>;
+        let projects = <?= json_encode($projects) ?>;
+        let dbError = <?= json_encode($db_error) ?>;
+
+        // Listen for updated data from AJAX loading
+        document.addEventListener('tabContentLoaded', function(e) {
+            if (e.detail.tabName === 'design') {
+                console.log('Updating design page data from AJAX...');
+                processes = e.detail.processes || processes;
+                projects = e.detail.projects || projects;
+                dbError = e.detail.dbError || dbError;
+                
+                // Re-populate dropdowns with updated data
+                setTimeout(() => {
+                    populateDropdowns();
+                }, 100);
+            }
+        });
+
+        // Function to populate dropdowns with current data
+        function populateDropdowns() {
+            const projectSelect = document.getElementById('project-select');
+            const processSelect = document.getElementById('process-select');
+            
+            if (projectSelect && projects) {
+                // Clear and repopulate project dropdown
+                const currentValue = projectSelect.value;
+                projectSelect.innerHTML = '<option value="">Select Project...</option>';
+                
+                projects.forEach(project => {
+                    const option = document.createElement('option');
+                    option.value = project.id;
+                    option.textContent = project.name;
+                    if (project.id == currentValue) {
+                        option.selected = true;
+                    }
+                    projectSelect.appendChild(option);
+                });
+                
+                console.log(`Populated project dropdown with ${projects.length} projects`);
+            }
+            
+            if (processSelect && processes) {
+                console.log(`Available processes data: ${processes.length} processes`);
+            }
+        }
 
         // Enhanced BPMN XML template
         const defaultBpmnXml = `<?xml version="1.0" encoding="UTF-8"?>

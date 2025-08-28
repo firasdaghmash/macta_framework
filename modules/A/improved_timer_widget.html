@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced MACTA Timer Widget</title>
+    <style>
+        :root {
+            --htt-blue: #1E88E5;
+            --htt-dark-blue: #1565C0;
+            --htt-light-blue: #42A5F5;
+            --macta-orange: #ff7b54;
+            --macta-red: #d63031;
+            --macta-teal: #00b894;
+            --macta-yellow: #fdcb6e;
+            --macta-green: #6c5ce7;
+            --macta-dark: #2d3436;
+            --macta-light: #ddd;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--htt-light-blue) 0%, var(--htt-blue) 100%);
+            min-height: 100vh;
+            padding: 20px;
+            position: relative;
+        }
+
+        /* Enhanced Timer Widget */
+        .enhanced-timer-widget {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            border: 3px solid var(--macta-green);
+            border-radius: 15px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.2);
+            z-index: 1000;
+            min-width: 320px;
+            max-width: 450px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+        }
+
+        /* Collapsed state */
+        .enhanced-timer-widget.collapsed {
+            min-width: 180px;
+            max-width: 180px;
+        }
+
+        .enhanced-timer-widget.collapsed .timer-content {
+            display: none;
+        }
+
+        .enhanced-timer-widget.collapsed .timer-header {
+            border-radius: 12px;
+            padding: 10px 15px;
+        }
+
+        .enhanced-timer-widget.collapsed .timer-display {
+            font-size: 18px;
+            margin: 5px 0;
+        }
+
+        /* Minimized state (tiny floating timer) */
+        .enhanced-timer-widget.minimized {
+            min-width: 120px;
+            max-width: 120px;
+            background: rgba(108, 92, 231, 0.95);
+            border: 2px solid var(--macta-green);
+            backdrop-filter: blur(10px);
+        }
+
+        .enhanced-timer-widget.minimized .timer-header {
+            color: white;
+            padding: 8px 10px;
+            border-radius: 10px;
+        }
+
+        .enhanced-timer-widget.minimized .timer-content {
+            display: none;
+        }
+
+        .enhanced-timer-widget.minimized .timer-display {
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            margin: 2px 0;
+        }
+
+        /* Header */
+        .timer-header {
+            background: linear-gradient(135deg, var(--macta-green), #5a54d9);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 12px 12px 0 0;
+            cursor: move;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+        }
+
+        .timer-header h4 {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 16px;
+        }
+
+        .timer-controls-header {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .header-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .header-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: scale(1.1);
+        }
+
+        /* Content */
+        .timer-content {
+            padding: 20px;
+        }
+
+        .timer-task-info {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .timer-task-info .task-name {
+            font-weight: bold;
+            color: var(--macta-green);
+            margin-bottom: 5px;
+        }
+
+        .timer-task-info .task-id {
+            font-size: 12px;
+            color: #666;
+            background: #f8f9fa;
+            padding: 2px 8px;
+            border-radius: 12px;
+            display: inline-block;
+        }
+
+        .timer-display {
+            font-size: 36px;
+            font-weight: bold;
+            color: var(--htt-blue);
+            font-family: 'Courier New', monospace;
+            text-align: center;
+            margin: 15px 0;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .timer-display.running {
+            color: var(--macta-green);
+            animation: pulse-glow 2s infinite;
+        }
+
+        @keyframes pulse-glow {
+            0% { 
+                opacity: 1;
+                text-shadow: 0 2px 4px rgba(108, 92, 231, 0.3);
+            }
+            50% { 
+                opacity: 0.8;
+                text-shadow: 0 4px 12px rgba(108, 92, 231, 0.6);
+            }
+            100% { 
+                opacity: 1;
+                text-shadow: 0 2px 4px rgba(108, 92, 231, 0.3);
+            }
+        }
+
+        /* Timer Controls */
+        .timer-main-controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 15px;
+        }
+
+        .btn {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            flex: 1;
+            justify-content: center;
+        }
+
+        .btn-success {
+            background: var(--macta-green);
+            color: white;
+        }
+
+        .btn-success:hover:not(:disabled) {
+            background: #5a54d9;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(108, 92, 231, 0.3);
+        }
+
+        .btn-danger {
+            background: var(--macta-red);
+            color: white;
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background: #b02a2a;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(214, 48, 49, 0.3);
+        }
+
+        .btn-primary {
+            background: var(--htt-blue);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: var(--htt-dark-blue);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(30, 136, 229, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
+        /* Expandable Resource Form */
+        .resource-section {
+            border-top: 1px solid #eee;
+            margin-top: 15px;
+            padding-top: 15px;
+        }
+
+        .resource-toggle {
+            width: 100%;
+            background: var(--htt-blue);
+            color: white;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .resource-toggle:hover {
+            background: var(--htt-dark-blue);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(30, 136, 229, 0.3);
+        }
+
+        .resource-form {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        .resource-form.expanded {
+            max-height: 400px;
+            padding: 15px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 500;
+            font-size: 12px;
+            color: #333;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 12px;
+            background: white;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            border-color: var(--htt-blue);
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(30, 136, 229, 0.1);
+        }
+
+        .resource-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 11px;
+            flex: 1;
+        }
+
+        /* Demo content */
+        .demo-content {
+            text-align: center;
+            margin: 50px auto;
+            max-width: 600px;
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .demo-content h1 {
+            color: var(--htt-blue);
+            margin-bottom: 20px;
+        }
+
+        .demo-content p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .demo-button {
+            background: var(--macta-green);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .demo-button:hover {
+            background: #5a54d9;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(108, 92, 231, 0.3);
+        }
+
+        /* Status indicators */
+        .status-indicator {
+            position: absolute;
+            top: -3px;
+            right: -3px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--macta-green);
+            border: 2px solid white;
+            animation: pulse-indicator 2s infinite;
+        }
+
+        .status-indicator.stopped {
+            background: #ccc;
+            animation: none;
+        }
+
+        @keyframes pulse-indicator {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Dragging styles */
+        .enhanced-timer-widget.dragging {
+            transform: rotate(3deg);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            z-index: 1001;
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--macta-green);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            z-index: 1002;
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(20px);
+        }
+    </style>
+</head>
+<body>
+    <!-- Demo content -->
+    <div class="demo-content">
+        <h1>MACTA Framework - Enhanced Timer Widget Demo</h1>
+        <p>This demo shows the improved timer widget with the requested features:</p>
+        <ul style="text-align: left; max-width: 500px; margin: 0 auto;">
+            <li><strong>Stop instead of Pause:</strong> Timer can be stopped and resumed</li>
+            <li><strong>Inline Resources:</strong> Resource form expands within the widget</li>
+            <li><strong>Always On Screen:</strong> Draggable, collapsible, and minimizable</li>
+            <li><strong>Enhanced UX:</strong> Smooth animations and better visual feedback</li>
+        </ul>
+        <br>
+        <button class="demo-button" onclick="showTimerWidget()">Start User Task Timer</button>
+    </div>
+
+    <!-- Enhanced Timer Widget (initially hidden) -->
+    <div id="enhanced-timer-widget" class="enhanced-timer-widget" style="display: none;">
+        <div class="timer-header" id="timer-header">
+            <h4>
+                <span>⏱️</span>
+                User Task Timer
+                <div class="status-indicator" id="status-indicator"></div>
+            </h4>
+            <div class="timer-controls-header">
+                <button class="header-btn" id="btn-minimize" title="Minimize" onclick="toggleMinimize()">—</button>
+                <button class="header-btn" id="btn-collapse" title="Collapse" onclick="toggleCollapse()">↕</button>
+                <button class="header-btn" id="btn-close" title="Close" onclick="closeTimer()">×</button>
+            </div>
+        </div>
+
+        <div class="timer-content" id="timer-content">
+            <div class="timer-task-info">
+                <div class="task-name" id="task-name">Push to CAD Inbox</div>
+                <div class="task-id">ID: Activity_1890J78</div>
+            </div>
+
+            <div class="timer-display" id="timer-display">00:00:00</div>
+
+            <div class="timer-main-controls">
+                <button class="btn btn-success" id="btn-start" onclick="startTimer()">
+                    ▶️ Start
+                </button>
+                <button class="btn btn-danger" id="btn-stop" onclick="stopTimer()" disabled>
+                    ⏹️ Stop
+                </button>
+                <button class="btn btn-success" id="btn-complete" onclick="completeTimer()" disabled>
+                    ✅ Complete
+                </button>
+            </div>
+
+            <!-- Resource Section -->
+            <div class="resource-section">
+                <button class="resource-toggle" id="resource-toggle" onclick="toggleResources()">
+                    👥 Assign Resources
+                    <span id="resource-arrow">▼</span>
+                </button>
+
+                <div class="resource-form" id="resource-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Resource Type:</label>
+                            <select id="resource-type">
+                                <option value="human">👤 Human</option>
+                                <option value="machine">🤖 Machine</option>
+                                <option value="both">⚡ Both</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Cost ($):</label>
+                            <input type="number" id="cost" value="50" min="0" step="0.01">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Processing Time (min):</label>
+                            <input type="number" id="processing-time" value="2" min="1">
+                        </div>
+                        <div class="form-group">
+                            <label>Priority:</label>
+                            <select id="priority">
+                                <option value="normal">Normal</option>
+                                <option value="high">High</option>
+                                <option value="urgent">Urgent</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Allocation Name:</label>
+                        <input type="text" id="allocation-name" placeholder="e.g., Senior Analyst" value="Push to CAD Inbox Assignment">
+                    </div>
+
+                    <div class="resource-actions">
+                        <button class="btn btn-success btn-sm" onclick="saveResources()">
+                            ✅ Save
+                        </button>
+                        <button class="btn btn-primary btn-sm" onclick="openResourcesPage()">
+                            📋 Full Page
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast notification -->
+    <div id="toast" class="toast"></div>
+
+    <script>
+        // Timer state
+        let timerState = {
+            isRunning: false,
+            startTime: null,
+            elapsedTime: 0,
+            interval: null,
+            isCollapsed: false,
+            isMinimized: false
+        };
+
+        // Dragging functionality
+        let isDragging = false;
+        let dragOffset = { x: 0, y: 0 };
+
+        const timerWidget = document.getElementById('enhanced-timer-widget');
+        const timerHeader = document.getElementById('timer-header');
+
+        // Initialize dragging
+        timerHeader.addEventListener('mousedown', startDrag);
+        document.addEventListener('mousemove', drag);
+        document.addEventListener('mouseup', stopDrag);
+
+        function startDrag(e) {
+            if (e.target.closest('.header-btn')) return; // Don't drag when clicking buttons
+            
+            isDragging = true;
+            timerWidget.classList.add('dragging');
+            
+            const rect = timerWidget.getBoundingClientRect();
+            dragOffset.x = e.clientX - rect.left;
+            dragOffset.y = e.clientY - rect.top;
+            
+            e.preventDefault();
+        }
+
+        function drag(e) {
+            if (!isDragging) return;
+            
+            const x = e.clientX - dragOffset.x;
+            const y = e.clientY - dragOffset.y;
+            
+            // Keep widget within viewport bounds
+            const maxX = window.innerWidth - timerWidget.offsetWidth;
+            const maxY = window.innerHeight - timerWidget.offsetHeight;
+            
+            const boundedX = Math.max(0, Math.min(x, maxX));
+            const boundedY = Math.max(0, Math.min(y, maxY));
+            
+            timerWidget.style.left = boundedX + 'px';
+            timerWidget.style.top = boundedY + 'px';
+            timerWidget.style.right = 'auto';
+        }
+
+        function stopDrag() {
+            isDragging = false;
+            timerWidget.classList.remove('dragging');
+        }
+
+        // Timer functions
+        function showTimerWidget() {
+            timerWidget.style.display = 'block';
+            setTimeout(() => {
+                timerWidget.style.opacity = '1';
+                timerWidget.style.transform = 'translateX(0)';
+            }, 10);
+        }
+
+        function startTimer() {
+            if (timerState.isRunning) return;
+            
+            timerState.isRunning = true;
+            timerState.startTime = Date.now() - timerState.elapsedTime;
+            
+            // Update UI
+            document.getElementById('btn-start').disabled = true;
+            document.getElementById('btn-stop').disabled = false;
+            document.getElementById('btn-complete').disabled = false;
+            document.getElementById('timer-display').classList.add('running');
+            document.getElementById('status-indicator').classList.remove('stopped');
+            
+            // Start timer display update
+            timerState.interval = setInterval(updateTimerDisplay, 1000);
+            updateTimerDisplay(); // Update immediately
+            
+            showToast('⏱️ Timer started successfully!', 'success');
+        }
+
+        function stopTimer() {
+            if (!timerState.isRunning) return;
+            
+            timerState.isRunning = false;
+            timerState.elapsedTime = Date.now() - timerState.startTime;
+            
+            // Update UI
+            document.getElementById('btn-start').disabled = false;
+            document.getElementById('btn-start').innerHTML = '▶️ Resume';
+            document.getElementById('btn-stop').disabled = true;
+            document.getElementById('timer-display').classList.remove('running');
+            document.getElementById('status-indicator').classList.add('stopped');
+            
+            // Stop timer display update
+            clearInterval(timerState.interval);
+            
+            showToast('⏹️ Timer stopped - you can resume anytime', 'warning');
+        }
+
+        function completeTimer() {
+            if (!timerState.isRunning && timerState.elapsedTime === 0) return;
+            
+            // Stop timer if running
+            if (timerState.isRunning) {
+                clearInterval(timerState.interval);
+            }
+            
+            const finalTime = timerState.isRunning ? Date.now() - timerState.startTime : timerState.elapsedTime;
+            const minutes = Math.floor(finalTime / 60000);
+            const seconds = Math.floor((finalTime % 60000) / 1000);
+            
+            // Reset timer state
+            timerState = {
+                isRunning: false,
+                startTime: null,
+                elapsedTime: 0,
+                interval: null,
+                isCollapsed: timerState.isCollapsed,
+                isMinimized: timerState.isMinimized
+            };
+            
+            // Reset UI
+            document.getElementById('timer-display').textContent = '00:00:00';
+            document.getElementById('timer-display').classList.remove('running');
+            document.getElementById('btn-start').disabled = false;
+            document.getElementById('btn-start').innerHTML = '▶️ Start';
+            document.getElementById('btn-stop').disabled = true;
+            document.getElementById('btn-complete').disabled = true;
+            document.getElementById('status-indicator').classList.add('stopped');
+            
+            showToast(`✅ Task completed in ${minutes}m ${seconds}s - Great work!`, 'success');
+            
+            // Auto-minimize after completion
+            setTimeout(() => {
+                if (!timerState.isMinimized) {
+                    toggleMinimize();
+                }
+            }, 2000);
+        }
+
+        function updateTimerDisplay() {
+            if (!timerState.isRunning) return;
+            
+            const elapsed = Date.now() - timerState.startTime;
+            const hours = Math.floor(elapsed / 3600000);
+            const minutes = Math.floor((elapsed % 3600000) / 60000);
+            const seconds = Math.floor((elapsed % 60000) / 1000);
+            
+            const display = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            document.getElementById('timer-display').textContent = display;
+        }
+
+        // Widget state functions
+        function toggleCollapse() {
+            timerState.isCollapsed = !timerState.isCollapsed;
+            timerWidget.classList.toggle('collapsed', timerState.isCollapsed);
+            document.getElementById('btn-collapse').innerHTML = timerState.isCollapsed ? '↕' : '↕';
+        }
+
+        function toggleMinimize() {
+            timerState.isMinimized = !timerState.isMinimized;
+            timerWidget.classList.toggle('minimized', timerState.isMinimized);
+            
+            if (timerState.isMinimized) {
+                // Remove collapsed state when minimizing
+                timerWidget.classList.remove('collapsed');
+                timerState.isCollapsed = false;
+            }
+        }
+
+        function closeTimer() {
+            if (timerState.isRunning) {
+                if (!confirm('Timer is still running. Are you sure you want to close it?')) {
+                    return;
+                }
+                clearInterval(timerState.interval);
+            }
+            
+            timerWidget.style.opacity = '0';
+            timerWidget.style.transform = 'translateX(100%)';
+            
+            setTimeout(() => {
+                timerWidget.style.display = 'none';
+                timerWidget.style.left = '';
+                timerWidget.style.top = '';
+                timerWidget.style.right = '20px';
+                timerWidget.style.transform = '';
+                timerWidget.style.opacity = '';
+                
+                // Reset states
+                timerWidget.classList.remove('collapsed', 'minimized');
+                timerState.isCollapsed = false;
+                timerState.isMinimized = false;
+            }, 300);
+        }
+
+        // Resource functions
+        function toggleResources() {
+            const resourceForm = document.getElementById('resource-form');
+            const resourceArrow = document.getElementById('resource-arrow');
+            
+            resourceForm.classList.toggle('expanded');
+            resourceArrow.innerHTML = resourceForm.classList.contains('expanded') ? '▲' : '▼';
+        }
+
+        function saveResources() {
+            const resourceType = document.getElementById('resource-type').value;
+            const cost = document.getElementById('cost').value;
+            const processingTime = document.getElementById('processing-time').value;
+            const allocationName = document.getElementById('allocation-name').value;
+            const priority = document.getElementById('priority').value;
+            
+            // Simulate saving (in real app, this would be an API call)
+            showToast(`💾 Resources saved: ${allocationName} (${resourceType}, $${cost}, ${processingTime}min)`, 'success');
+            
+            // Auto-collapse resource form
+            setTimeout(() => {
+                document.getElementById('resource-form').classList.remove('expanded');
+                document.getElementById('resource-arrow').innerHTML = '▼';
+            }, 1000);
+        }
+
+        function openResourcesPage() {
+            showToast('📋 Opening full resources page...', 'info');
+            // In real app, this would navigate to the resources tab
+        }
+
+        // Toast notification
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            
+            // Set color based on type
+            const colors = {
+                success: '#00b894',
+                warning: '#fdcb6e',
+                error: '#d63031',
+                info: '#1E88E5'
+            };
+            
+            toast.style.background = colors[type] || colors.info;
+            toast.textContent = message;
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // Auto-show widget on page load for demo
+        setTimeout(() => {
+            showTimerWidget();
+        }, 1000);
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (timerWidget.style.left) {
+                // Reposition if dragged and window resized
+                const rect = timerWidget.getBoundingClientRect();
+                if (rect.right > window.innerWidth || rect.bottom > window.innerHeight) {
+                    timerWidget.style.left = '';
+                    timerWidget.style.top = '';
+                    timerWidget.style.right = '20px';
+                }
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (timerWidget.style.display === 'none') return;
+            
+            if (e.key === ' ' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                if (timerState.isRunning) {
+                    stopTimer();
+                } else if (timerState.elapsedTime > 0 || !timerState.isRunning) {
+                    startTimer();
+                }
+            }
+            
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                completeTimer();
+            }
+            
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                toggleMinimize();
+            }
+        });
+    </script>
+</body>
+</html>
