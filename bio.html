@@ -56,11 +56,11 @@
 
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, var(--htt-primary) 0%, var(--htt-primary-dark) 50%, #0F172A 100%);
+            background: linear-gradient(135deg, #0F172A 0%, #1E293B 30%, #334155 100%);
             background-attachment: fixed;
             min-height: 100vh;
             line-height: 1.6;
-            color: var(--text-primary);
+            color: white;
             overflow-x: hidden;
         }
 
@@ -72,11 +72,18 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-image: 
-                radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
-                radial-gradient(circle at 75% 75%, rgba(255, 255, 255, 0.05) 0%, transparent 50%);
+            background: 
+                radial-gradient(circle at 20% 20%, rgba(44, 125, 199, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(56, 178, 172, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 50% 50%, rgba(255, 123, 43, 0.05) 0%, transparent 70%);
             pointer-events: none;
             z-index: -1;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(1deg); }
         }
 
         .container {
@@ -127,21 +134,17 @@
             transform: translateY(-2px);
         }
 
+        /* Enhanced Logo with New MACTA Transparent Logo */
         .logo-icon {
-            width: 64px;
-            height: 64px;
-            background: linear-gradient(135deg, var(--htt-primary), var(--htt-primary-light));
-            border-radius: var(--border-radius-md);
-            box-shadow: var(--card-shadow);
+            width: auto;
+            height: 80px;
             transition: all var(--transition-normal);
-            position: relative;
-            overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 24px;
-            font-weight: 800;
+            filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.15));
+        }
+
+        .logo-icon:hover {
+            transform: scale(1.05);
+            filter: drop-shadow(0 8px 20px rgba(44, 125, 199, 0.3));
         }
 
         .company-info h1 {
@@ -184,13 +187,32 @@
         }
 
         .btn-outline {
-            border: 2px solid var(--htt-primary);
-            color: var(--htt-primary);
-            background: transparent;
+            border: 2px solid rgba(44, 125, 199, 0.4);
+            color: #2C7DC7;
+            background: rgba(44, 125, 199, 0.05);
+            backdrop-filter: blur(10px);
         }
 
         .btn-outline:hover {
-            background: var(--htt-primary);
+            background: rgba(44, 125, 199, 0.1);
+            border-color: #2C7DC7;
+            color: #1B5B9E;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(44, 125, 199, 0.2);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #2C7DC7, #1B5B9E);
+            color: white;
+            box-shadow: 0 4px 15px rgba(44, 125, 199, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(44, 125, 199, 0.4);
+            background: linear-gradient(135deg, #1B5B9E, #2C7DC7);
+        }
             color: white;
             transform: translateY(-2px);
             box-shadow: var(--card-shadow);
@@ -589,11 +611,7 @@
         <div class="container">
             <div class="header-content">
                 <div class="logo-section">
-                    <div class="logo-icon">HTT</div>
-                    <div class="company-info">
-                        <h1>High Tech Talents</h1>
-                        <div class="company-tagline">Excellence in Process Innovation</div>
-                    </div>
+                    <img src="assets/images/macta4-transperent.png" alt="MACTA Framework" class="logo-icon">
                 </div>
                 <div class="header-actions">
                     <a href="index.html" class="btn btn-outline">

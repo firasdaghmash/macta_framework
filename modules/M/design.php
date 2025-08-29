@@ -399,6 +399,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             justify-content: flex-end;
         }
 
+        /* File input styling */
+        .file-input-container {
+            position: relative;
+            display: inline-block;
+        }
+
+        .file-input {
+            position: absolute;
+            left: -9999px;
+            opacity: 0;
+        }
+
+        .file-input-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: var(--primary-color);
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            border: none;
+        }
+
+        .file-input-label:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .selector-row {
@@ -452,6 +484,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             
             <div class="action-buttons">
                 <button class="btn btn-success" id="btn-create-new">🆕 Create New</button>
+                <div class="file-input-container">
+                    <input type="file" id="file-import" class="file-input" accept=".bpmn,.xml" />
+                    <label for="file-import" class="file-input-label">
+                        📁 Import BPMN
+                    </label>
+                </div>
                 <button class="btn btn-macta" id="btn-save-process">💾 Save</button>
                 <button class="btn btn-primary" id="btn-save-as">📑 Save As</button>
                 <button class="btn btn-warning" id="btn-rename-process" disabled>✏️ Rename</button>
@@ -467,7 +505,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 <button class="btn btn-secondary" id="btn-clear-designer">🗑️ Clear Canvas</button>
                 <button class="btn btn-secondary" id="btn-zoom-in">🔍+ Zoom In</button>
                 <button class="btn btn-secondary" id="btn-zoom-out">🔍- Zoom Out</button>
-                <button class="btn btn-secondary" id="btn-zoom-fit">📐 Fit Screen</button>
+                <button class="btn btn-secondary" id="btn-zoom-fit">🔎 Fit Screen</button>
                 <button class="btn btn-success" id="btn-export-xml">📤 Export XML</button>
             </div>
         </div>
@@ -734,6 +772,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             document.getElementById('btn-zoom-out').addEventListener('click', () => modeler && modeler.get('zoomScroll').stepZoom(-1));
             document.getElementById('btn-zoom-fit').addEventListener('click', () => modeler && modeler.get('canvas').zoom('fit-viewport'));
             
+            // File import event - NEW
+            document.getElementById('file-import').addEventListener('change', handleFileImport);
+            
             // Modal events
             setupModalEventListeners();
             
@@ -742,6 +783,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 const eventBus = modeler.get('eventBus');
                 eventBus.on(['shape.added', 'shape.removed', 'connection.added', 'connection.removed'], updateElementCount);
             }
+        }
+
+        // Handle file import - NEW FUNCTION
+        async function handleFileImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Validate file type
+            if (!file.name.toLowerCase().endsWith('.bpmn') && !file.name.toLowerCase().endsWith('.xml')) {
+                alert('Please select a valid BPMN file (.bpmn or .xml)');
+                event.target.value = '';
+                return;
+            }
+
+            try {
+                updateStatus('Importing BPMN file...');
+                
+                const fileContent = await readFileAsText(file);
+                
+                // Validate XML content
+                if (!fileContent.includes('<bpmn') && !fileContent.includes('<bpmn2:')) {
+                    throw new Error('Invalid BPMN file format');
+                }
+                
+                // Import the BPMN content
+                await modeler.importXML(fileContent);
+                modeler.get('canvas').zoom('fit-viewport');
+                
+                // Update current process info
+                currentXML = fileContent;
+                currentProcessId = null; // New imported process
+                currentProcessName = file.name.replace(/\.(bpmn|xml)$/i, '').replace(/[_-]/g, ' ');
+                
+                // Update UI
+                document.getElementById('process-select').value = '';
+                document.getElementById('current-process').textContent = currentProcessName + ' (Imported - Unsaved)';
+                
+                updateStatus('BPMN file imported successfully');
+                updateElementCount();
+                updateButtonStates();
+                
+                alert('BPMN file "' + file.name + '" imported successfully! The process is now loaded in the designer. Use "Save" to store it in the database.');
+                
+            } catch (error) {
+                console.error('Import error:', error);
+                alert('Failed to import BPMN file: ' + error.message);
+                updateStatus('Import failed');
+            }
+            
+            // Clear the file input
+            event.target.value = '';
+        }
+
+        // Helper function to read file as text - NEW FUNCTION
+        function readFileAsText(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = (e) => reject(new Error('Failed to read file'));
+                reader.readAsText(file);
+            });
         }
 
         // Setup modal event listeners
@@ -766,7 +868,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         // Load processes by project
         async function loadProcessesByProject(projectId) {
             try {
-                updateStatus('📥 Loading processes...');
+                updateStatus('🔥 Loading processes...');
                 
                 const formData = new FormData();
                 formData.append('action', 'get_processes_by_project');
@@ -811,7 +913,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         // Load specific process
         async function loadProcess(processId) {
             try {
-                updateStatus('📂 Loading process...');
+                updateStatus('🔂 Loading process...');
                 
                 const formData = new FormData();
                 formData.append('action', 'load_process');
@@ -884,7 +986,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 
                 let processName = currentProcessName;
                 if (!processName || processName === '') {
-                    processName = prompt('📝 Enter process name:', 'New Process') || 'Untitled Process';
+                    processName = prompt('🔹 Enter process name:', 'New Process') || 'Untitled Process';
                 }
                 
                 updateStatus('💾 Saving process...');

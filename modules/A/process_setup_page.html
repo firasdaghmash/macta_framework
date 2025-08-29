@@ -1,0 +1,2119 @@
+<?php
+// modules/M/process_setup.php - Combined Process Setup with Resource Allocation & Timer
+
+// Initialize variables
+$processes = [];
+$db_error = '';
+$pdo = null;
+
+// Database connection using existing pattern
+try {
+    // Check if config exists
+    if (file_exists('../../config/config.php')) {
+        require_once '../../config/config.php';
+        
+        // Create PDO connection
+        $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4";
+        $pdo = new PDO($dsn, DB_USER, DB_PASS, array(
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES => false
+        ));
+        
+        // Get all processes from database
+        $stmt = $pdo->prepare("
+            SELECT pm.*, p.name as project_name 
+            FROM process_models pm 
+            LEFT JOIN projects p ON pm.project_id = p.id 
+            ORDER BY pm.updated_at DESC
+        ");
+        $stmt->execute();
+        $processes = $stmt->fetchAll();
+        
+        // Create missing tables if they don't exist
+        createMissingTables($pdo);
+        
+    } else {
+        $db_error = 'Database configuration not found. Please run the installer first.';
+    }
+    
+} catch (Exception $e) {
+    $db_error = "Database connection failed: " . $e->getMessage();
+    error_log("Process Setup DB Error: " . $e->getMessage());
+}
+
+// Function to create missing tables
+function createMissingTables($pdo) {
+    try {
+        // Create resource_allocations table if it doesn't exist
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS resource_allocations (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                process_id INT NOT NULL,
+                task_id VARCHAR(255) NOT NULL,
+                allocation_name VARCHAR(255),
+                resource_type ENUM('human', 'machine', 'both') DEFAULT 'human',
+                cost DECIMAL(10,2) DEFAULT 0,
+                processing_time INT DEFAULT 0,
+                notes TEXT,
+                created_by INT DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY unique_task (process_id, task_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+        ");
+        
+        // Create timer_sessions table if it doesn't exist
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS timer_sessions (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                user_id INT DEFAULT 1,
+                process_id INT NOT NULL,
+                task_id VARCHAR(255) NOT NULL,
+                start_time TIMESTAMP NULL,
+                end_time TIMESTAMP NULL,
+                total_duration INT DEFAULT 0,
+                pause_duration INT DEFAULT 0,
+                status ENUM('active', 'paused', 'completed') DEFAULT 'active',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+        ");
+        
+        // Create timer_averages table if it doesn't exist
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS timer_averages (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                process_id INT NOT NULL,
+                task_id VARCHAR(255) NOT NULL,
+                average_duration INT DEFAULT 0,
+                session_count INT DEFAULT 0,
+                is_overridden BOOLEAN DEFAULT FALSE,
+                override_value INT DEFAULT NULL,
+                last_calculated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY unique_task_avg (process_id, task_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+        ");
+        
+    } catch (Exception $e) {
+        error_log("Error creating tables: " . $e->getMessage());
+    }
+}
+
+// Start session if not started
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Handle AJAX requests
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    header('Content-Type: application/json');
+    
+    if (!empty($db_error) || !$pdo) {
+        echo json_encode(array('success' => false, 'message' => $db_error ? $db_error : 'Database connection not available'));
+        exit;
+    }
+    
+    switch ($_POST['action']) {
+        case 'save_resource_allocation':
+            try {
+                $stmt = $pdo->prepare("
+                    INSERT INTO resource_allocations 
+                    (process_id, task_id, allocation_name, resource_type, cost, processing_time, notes, created_by) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE 
+                    allocation_name = VALUES(allocation_name),
+                    resource_type = VALUES(resource_type),
+                    cost = VALUES(cost),
+                    processing_time = VALUES(processing_time),
+                    notes = VALUES(notes),
+                    updated_at = CURRENT_TIMESTAMP
+                ");
+                $stmt->execute(array(
+                    isset($_POST['process_id']) ? $_POST['process_id'] : 0,
+                    isset($_POST['task_id']) ? $_POST['task_id'] : '',
+                    isset($_POST['allocation_name']) ? $_POST['allocation_name'] : 'Default Allocation',
+                    isset($_POST['resource_type']) ? $_POST['resource_type'] : 'human',
+                    isset($_POST['cost']) ? $_POST['cost'] : 0,
+                    isset($_POST['processing_time']) ? $_POST['processing_time'] : 0,
+                    isset($_POST['notes']) ? $_POST['notes'] : '',
+                    isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 1
+                ));
+
+                echo json_encode(['success' => true, 'message' => 'Resource allocation saved successfully']);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            }
+            exit;
+            
+        case 'load_resource_allocations':
+            try {
+                $stmt = $pdo->prepare("
+                    SELECT * FROM resource_allocations 
+                    WHERE process_id = ? 
+                    ORDER BY created_at DESC
+                ");
+                $stmt->execute(array(isset($_POST['process_id']) ? $_POST['process_id'] : 0));
+                $allocations = $stmt->fetchAll();
+                echo json_encode(['success' => true, 'allocations' => $allocations]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            }
+            exit;
+            
+        case 'start_timer':
+            try {
+                // Check if user has active timer
+                $stmt = $pdo->prepare("
+                    SELECT COUNT(*) as active_count 
+                    FROM timer_sessions 
+                    WHERE user_id = ? AND status = 'active'
+                ");
+                $stmt->execute(array(isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 1));
+                $result = $stmt->fetch();
+                
+                if ($result['active_count'] > 0) {
+                    echo json_encode(array('success' => false, 'message' => 'You already have an active timer. Please complete or pause it first.'));
+                    exit;
+                }
+                
+                $stmt = $pdo->prepare("
+                    INSERT INTO timer_sessions 
+                    (user_id, process_id, task_id, start_time, status) 
+                    VALUES (?, ?, ?, NOW(), 'active')
+                ");
+                $stmt->execute(array(
+                    isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 1,
+                    isset($_POST['process_id']) ? $_POST['process_id'] : 0,
+                    isset($_POST['task_id']) ? $_POST['task_id'] : ''
+                ));
+                
+                echo json_encode(array('success' => true, 'session_id' => $pdo->lastInsertId(), 'message' => 'Timer started successfully'));
+            } catch (Exception $e) {
+                echo json_encode(array('success' => false, 'message' => $e->getMessage()));
+            }
+            exit;
+            
+        case 'stop_timer':
+            try {
+                $stmt = $pdo->prepare("
+                    UPDATE timer_sessions 
+                    SET status = 'paused', 
+                        total_duration = TIMESTAMPDIFF(SECOND, start_time, NOW()) - COALESCE(pause_duration, 0),
+                        updated_at = CURRENT_TIMESTAMP 
+                    WHERE id = ? AND user_id = ?
+                ");
+                $stmt->execute(array(
+                    isset($_POST['session_id']) ? $_POST['session_id'] : 0,
+                    isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 1
+                ));
+                echo json_encode(array('success' => true, 'message' => 'Timer stopped successfully'));
+            } catch (Exception $e) {
+                echo json_encode(array('success' => false, 'message' => $e->getMessage()));
+            }
+            exit;
+            
+        case 'complete_timer':
+            try {
+                $stmt = $pdo->prepare("
+                    UPDATE timer_sessions 
+                    SET status = 'completed', 
+                        end_time = NOW(),
+                        total_duration = TIMESTAMPDIFF(SECOND, start_time, NOW()) - COALESCE(pause_duration, 0),
+                        updated_at = CURRENT_TIMESTAMP 
+                    WHERE id = ? AND user_id = ?
+                ");
+                $stmt->execute(array(
+                    isset($_POST['session_id']) ? $_POST['session_id'] : 0,
+                    isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 1
+                ));
+                
+                // Update timer averages
+                $stmt = $pdo->prepare("
+                    SELECT process_id, task_id, total_duration 
+                    FROM timer_sessions 
+                    WHERE id = ?
+                ");
+                $stmt->execute(array(isset($_POST['session_id']) ? $_POST['session_id'] : 0));
+                $session = $stmt->fetch();
+                
+                if ($session) {
+                    // Calculate new average
+                    $stmt = $pdo->prepare("
+                        SELECT AVG(total_duration) as avg_duration, COUNT(*) as session_count 
+                        FROM timer_sessions 
+                        WHERE process_id = ? AND task_id = ? AND status = 'completed'
+                    ");
+                    $stmt->execute(array($session['process_id'], $session['task_id']));
+                    $avg_data = $stmt->fetch();
+                    
+                    if ($avg_data['avg_duration']) {
+                        $stmt = $pdo->prepare("
+                            INSERT INTO timer_averages 
+                            (process_id, task_id, average_duration, session_count, last_calculated) 
+                            VALUES (?, ?, ?, ?, NOW())
+                            ON DUPLICATE KEY UPDATE 
+                            average_duration = VALUES(average_duration),
+                            session_count = VALUES(session_count),
+                            last_calculated = NOW()
+                        ");
+                        $stmt->execute(array(
+                            $session['process_id'],
+                            $session['task_id'],
+                            round($avg_data['avg_duration']),
+                            $avg_data['session_count']
+                        ));
+                    }
+                }
+                
+                echo json_encode(array('success' => true, 'message' => 'Timer completed and average updated'));
+            } catch (Exception $e) {
+                echo json_encode(array('success' => false, 'message' => $e->getMessage()));
+            }
+            exit;
+            
+        case 'get_active_timer':
+            try {
+                $stmt = $pdo->prepare("
+                    SELECT id, process_id, task_id, start_time, 
+                           TIMESTAMPDIFF(SECOND, start_time, NOW()) as elapsed_seconds
+                    FROM timer_sessions 
+                    WHERE user_id = ? AND status = 'active'
+                    LIMIT 1
+                ");
+                $stmt->execute(array(isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 1));
+                $timer = $stmt->fetch();
+                echo json_encode(array('success' => true, 'timer' => $timer));
+            } catch (Exception $e) {
+                echo json_encode(array('success' => false, 'message' => $e->getMessage()));
+            }
+            exit;
+    }
+}
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MACTA Framework - Process Setup</title>
+
+    <style>
+        :root {
+            /* MACTA Brand Colors */
+            --htt-blue: #1E88E5;
+            --htt-dark-blue: #1565C0;
+            --htt-light-blue: #42A5F5;
+            --macta-orange: #ff7b54;
+            --macta-red: #d63031;
+            --macta-teal: #00b894;
+            --macta-yellow: #fdcb6e;
+            --macta-green: #6c5ce7;
+            --macta-dark: #2d3436;
+            --macta-light: #ddd;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--htt-light-blue) 0%, var(--htt-blue) 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--htt-blue) 0%, var(--htt-dark-blue) 100%);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .macta-logo {
+            width: 50px;
+            height: 50px;
+            background: white;
+            color: var(--htt-blue);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .main-content {
+            padding: 30px;
+            min-height: 70vh;
+        }
+
+        .process-selector {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .process-selector h2 {
+            margin-bottom: 15px;
+            color: var(--htt-blue);
+        }
+
+        .process-selector select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--macta-light);
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+        }
+
+        .process-viewer-container {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 20px;
+            height: 600px;
+        }
+
+        .process-viewer {
+            border: 2px solid var(--macta-light);
+            border-radius: 10px;
+            background: #fafafa;
+            position: relative;
+            overflow: auto;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .sidebar-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            border: 1px solid var(--macta-light);
+        }
+
+        .sidebar-section h3 {
+            margin-bottom: 15px;
+            color: var(--htt-blue);
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .task-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .task-item {
+            background: white;
+            border: 1px solid var(--macta-light);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 13px;
+        }
+
+        .task-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border-color: var(--htt-blue);
+        }
+
+        .user-task-item {
+            border-left: 4px solid var(--macta-green);
+        }
+
+        .other-task-item {
+            border-left: 4px solid var(--htt-blue);
+        }
+
+        .task-item.active-timer {
+            border-color: var(--macta-green);
+            background: #e8f5e8;
+        }
+
+        .running-timer {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        .allocations-list {
+            max-height: 180px;
+            overflow-y: auto;
+        }
+
+        .allocation-item {
+            background: white;
+            border: 1px solid var(--macta-light);
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+
+        .allocation-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+        }
+
+        .btn-primary {
+            background: var(--htt-blue);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--htt-dark-blue);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(30,136,229,0.3);
+        }
+
+        /* Enhanced Timer Widget Styles */
+        .enhanced-timer-widget {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            border: 3px solid var(--macta-green);
+            border-radius: 15px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.2);
+            z-index: 1000;
+            min-width: 320px;
+            max-width: 450px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+            display: none;
+        }
+
+        .enhanced-timer-widget.collapsed {
+            min-width: 180px;
+            max-width: 180px;
+        }
+
+        .enhanced-timer-widget.collapsed .timer-content {
+            display: none;
+        }
+
+        .enhanced-timer-widget.minimized {
+            min-width: 120px;
+            max-width: 120px;
+            background: rgba(108, 92, 231, 0.95);
+            border: 2px solid var(--macta-green);
+            backdrop-filter: blur(10px);
+        }
+
+        .enhanced-timer-widget.minimized .timer-header {
+            color: white;
+            padding: 8px 10px;
+            border-radius: 10px;
+        }
+
+        .enhanced-timer-widget.minimized .timer-content {
+            display: none;
+        }
+
+        .timer-header {
+            background: linear-gradient(135deg, var(--macta-green), #5a54d9);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 12px 12px 0 0;
+            cursor: move;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+        }
+
+        .timer-header h4 {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 16px;
+        }
+
+        .timer-controls-header {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .header-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .header-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: scale(1.1);
+        }
+
+        .timer-content {
+            padding: 20px;
+        }
+
+        .timer-task-info {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .timer-task-info .task-name {
+            font-weight: bold;
+            color: var(--macta-green);
+            margin-bottom: 5px;
+        }
+
+        .timer-task-info .task-id {
+            font-size: 12px;
+            color: #666;
+            background: #f8f9fa;
+            padding: 2px 8px;
+            border-radius: 12px;
+            display: inline-block;
+        }
+
+        .timer-display {
+            font-size: 36px;
+            font-weight: bold;
+            color: var(--htt-blue);
+            font-family: 'Courier New', monospace;
+            text-align: center;
+            margin: 15px 0;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .timer-display.running {
+            color: var(--macta-green);
+            animation: pulse-glow 2s infinite;
+        }
+
+        @keyframes pulse-glow {
+            0% { 
+                opacity: 1;
+                text-shadow: 0 2px 4px rgba(108, 92, 231, 0.3);
+            }
+            50% { 
+                opacity: 0.8;
+                text-shadow: 0 4px 12px rgba(108, 92, 231, 0.6);
+            }
+            100% { 
+                opacity: 1;
+                text-shadow: 0 2px 4px rgba(108, 92, 231, 0.3);
+            }
+        }
+
+        .timer-main-controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 15px;
+        }
+
+        .btn-success {
+            background: var(--macta-green);
+            color: white;
+            flex: 1;
+            justify-content: center;
+        }
+
+        .btn-success:hover:not(:disabled) {
+            background: #5a54d9;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(108, 92, 231, 0.3);
+        }
+
+        .btn-danger {
+            background: var(--macta-red);
+            color: white;
+            flex: 1;
+            justify-content: center;
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background: #b02a2a;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(214, 48, 49, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
+        /* Resource Widget Styles */
+        .resource-widget {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            border: 3px solid var(--htt-blue);
+            border-radius: 15px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.2);
+            z-index: 1000;
+            min-width: 320px;
+            max-width: 450px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+            display: none;
+        }
+
+        .resource-header {
+            background: linear-gradient(135deg, var(--htt-blue), var(--htt-dark-blue));
+            color: white;
+            padding: 15px 20px;
+            border-radius: 12px 12px 0 0;
+            cursor: move;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .resource-section {
+            border-top: 1px solid #eee;
+            margin-top: 15px;
+            padding-top: 15px;
+        }
+
+        .resource-toggle {
+            width: 100%;
+            background: var(--htt-blue);
+            color: white;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .resource-form {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        .resource-form.expanded {
+            max-height: 400px;
+            padding: 15px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 500;
+            font-size: 12px;
+            color: #333;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 12px;
+            background: white;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            border-color: var(--htt-blue);
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(30, 136, 229, 0.1);
+        }
+
+        .resource-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 11px;
+            flex: 1;
+        }
+
+        .status-indicator {
+            position: absolute;
+            top: -3px;
+            right: -3px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--macta-green);
+            border: 2px solid white;
+            animation: pulse-indicator 2s infinite;
+        }
+
+        .status-indicator.stopped {
+            background: #ccc;
+            animation: none;
+        }
+
+        @keyframes pulse-indicator {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .enhanced-timer-widget.dragging,
+        .resource-widget.dragging {
+            transform: rotate(3deg);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            z-index: 1001;
+        }
+
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--macta-green);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            z-index: 1002;
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(20px);
+        }
+
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+            font-size: 16px;
+            color: var(--macta-orange);
+        }
+
+        .status-bar {
+            background: var(--macta-light);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-size: 14px;
+            color: var(--macta-dark);
+            border-left: 4px solid var(--htt-blue);
+        }
+
+        /* Highlighting styles for BPMN elements */
+        .bjs-container .djs-element.highlighted-user-task .djs-visual > :nth-child(1) {
+            stroke: var(--macta-green) !important;
+            stroke-width: 3px !important;
+            fill: #e8f5e8 !important;
+        }
+
+        .bjs-container .djs-element.highlighted-other-task .djs-visual > :nth-child(1) {
+            stroke: var(--htt-blue) !important;
+            stroke-width: 3px !important;
+            fill: #e3f2fd !important;
+        }
+
+        .bjs-container .djs-element.running-timer .djs-visual > :nth-child(1) {
+            stroke: var(--macta-green) !important;
+            stroke-width: 4px !important;
+            fill: #e8f5e8 !important;
+            animation: pulse 2s infinite !important;
+        }
+
+        @media (max-width: 1200px) {
+            .process-viewer-container {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+            
+            .process-viewer {
+                height: 400px;
+                margin-bottom: 20px;
+            }
+            
+            .sidebar {
+                flex-direction: row;
+                overflow-x: auto;
+            }
+            
+            .sidebar-section {
+                min-width: 300px;
+            }
+        }
+    </style>
+
+    <!-- Include BPMN.js for process visualization -->
+    <link rel="stylesheet" href="https://unpkg.com/bpmn-js@17.0.0/dist/assets/diagram-js.css" />
+    <link rel="stylesheet" href="https://unpkg.com/bpmn-js@17.0.0/dist/assets/bpmn-font/css/bpmn-embedded.css" />
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                <div class="macta-logo">M</div>
+                MACTA Framework - Process Setup
+            </h1>
+            <div>
+                <a href="../../index.php" class="btn btn-primary">
+                    Back to Framework
+                </a>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="process-selector">
+                <h2>Process Selection & Setup</h2>
+                <select id="process-select">
+                    <option value="">Select a Process to Setup...</option>
+                    <?php foreach ($processes as $process): ?>
+                        <option value="<?= $process['id'] ?>" data-xml="<?= htmlspecialchars($process['model_data']) ?>">
+                            <?= htmlspecialchars($process['name']) ?> 
+                            <?php if ($process['project_name']): ?>
+                                (<?= htmlspecialchars($process['project_name']) ?>)
+                            <?php endif; ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="process-viewer-container">
+                <!-- BPMN Process Viewer -->
+                <div id="process-viewer" class="process-viewer">
+                    <div class="loading">Select a process from the dropdown above to view it here...</div>
+                </div>
+
+                <!-- Sidebar with Tasks and Resource Allocations -->
+                <div class="sidebar">
+                    <!-- User Tasks Section -->
+                    <div class="sidebar-section">
+                        <h3>User Tasks (Timer)</h3>
+                        <div id="user-tasks-list" class="task-list">
+                            <div class="loading" style="height: 100px; font-size: 12px;">Select a process to view user tasks</div>
+                        </div>
+                    </div>
+
+                    <!-- Other Tasks Section -->
+                    <div class="sidebar-section">
+                        <h3>Other Tasks (Resources)</h3>
+                        <div id="other-tasks-list" class="task-list">
+                            <div class="loading" style="height: 100px; font-size: 12px;">Select a process to view other tasks</div>
+                        </div>
+                    </div>
+
+                    <!-- Current Allocations -->
+                    <div class="sidebar-section">
+                        <h3>Resource Allocations</h3>
+                        <div id="allocations-list" class="allocations-list">
+                            <div class="loading" style="height: 100px; font-size: 12px;">Select a process to view allocations</div>
+                        </div>
+                        <button class="btn btn-primary" style="width: 100%; margin-top: 10px;" onclick="refreshAllocations()">
+                            Refresh Allocations
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="status-bar">
+                <span id="status-message">
+                    <?php if (!empty($db_error)): ?>
+                        Database Error: <?= htmlspecialchars($db_error) ?>
+                    <?php elseif (count($processes) > 0): ?>
+                        Found <?= count($processes) ?> processes in database. Select a process to begin setup.
+                    <?php else: ?>
+                        No processes found. Please create a process first using the modeling module.
+                    <?php endif; ?>
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Enhanced Timer Widget -->
+    <div id="enhanced-timer-widget" class="enhanced-timer-widget">
+        <div class="timer-header" id="timer-header">
+            <h4>
+                <span>Timer</span>
+                User Task Timer
+                <div class="status-indicator" id="status-indicator" class="stopped"></div>
+            </h4>
+            <div class="timer-controls-header">
+                <button class="header-btn" id="btn-minimize" title="Minimize" onclick="toggleMinimize()">−</button>
+                <button class="header-btn" id="btn-collapse" title="Collapse" onclick="toggleCollapse()">↕</button>
+                <button class="header-btn" id="btn-close" title="Close" onclick="closeTimer()">×</button>
+            </div>
+        </div>
+
+        <div class="timer-content" id="timer-content">
+            <div class="timer-task-info">
+                <div class="task-name" id="task-name">No Task Selected</div>
+                <div class="task-id" id="task-id-display">ID: -</div>
+            </div>
+
+            <div class="timer-display" id="timer-display">00:00:00</div>
+
+            <div class="timer-main-controls">
+                <button class="btn btn-success" id="btn-start" onclick="startTimer()">
+                    Start
+                </button>
+                <button class="btn btn-danger" id="btn-stop" onclick="stopTimer()" disabled>
+                    Stop
+                </button>
+                <button class="btn btn-success" id="btn-complete" onclick="completeTimer()" disabled>
+                    Complete
+                </button>
+            </div>
+
+            <!-- Resource Section -->
+            <div class="resource-section">
+                <button class="resource-toggle" id="resource-toggle" onclick="toggleResources()">
+                    Assign Resources
+                    <span id="resource-arrow">▼</span>
+                </button>
+
+                <div class="resource-form" id="resource-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Resource Type:</label>
+                            <select id="resource-type">
+                                <option value="human">Human</option>
+                                <option value="machine">Machine</option>
+                                <option value="both">Both</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Cost ($):</label>
+                            <input type="number" id="cost" value="50" min="0" step="0.01">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Processing Time (min):</label>
+                            <input type="number" id="processing-time" value="30" min="1">
+                        </div>
+                        <div class="form-group">
+                            <label>Priority:</label>
+                            <select id="priority">
+                                <option value="normal">Normal</option>
+                                <option value="high">High</option>
+                                <option value="urgent">Urgent</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Allocation Name:</label>
+                        <input type="text" id="allocation-name" placeholder="e.g., Senior Analyst">
+                    </div>
+
+                    <div class="resource-actions">
+                        <button class="btn btn-success btn-sm" onclick="saveResources()">
+                            Save
+                        </button>
+                        <button class="btn btn-primary btn-sm" onclick="openResourcesPage()">
+                            Full Page
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resource Widget for Non-User Tasks -->
+    <div id="resource-widget" class="resource-widget">
+        <div class="resource-header" id="resource-header">
+            <h4>
+                <span>Resources</span>
+                Resource Assignment
+            </h4>
+            <div class="timer-controls-header">
+                <button class="header-btn" id="btn-resource-minimize" title="Minimize" onclick="toggleResourceMinimize()">−</button>
+                <button class="header-btn" id="btn-resource-close" title="Close" onclick="closeResourceWidget()">×</button>
+            </div>
+        </div>
+
+        <div class="timer-content" id="resource-widget-content">
+            <div class="timer-task-info">
+                <div class="task-name" id="resource-task-name">No Task Selected</div>
+                <div class="task-id" id="resource-task-id-display">ID: -</div>
+            </div>
+
+            <div class="resource-form expanded" id="resource-widget-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Resource Type:</label>
+                        <select id="resource-widget-type">
+                            <option value="human">Human</option>
+                            <option value="machine">Machine</option>
+                            <option value="both">Both</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Cost ($):</label>
+                        <input type="number" id="resource-widget-cost" value="50" min="0" step="0.01">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Processing Time (min):</label>
+                        <input type="number" id="resource-widget-time" value="15" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Priority:</label>
+                        <select id="resource-widget-priority">
+                            <option value="normal">Normal</option>
+                            <option value="high">High</option>
+                            <option value="urgent">Urgent</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Allocation Name:</label>
+                    <input type="text" id="resource-widget-allocation" placeholder="e.g., System Process Handler">
+                </div>
+
+                <div class="resource-actions">
+                    <button class="btn btn-success btn-sm" onclick="saveResourceWidgetData()">
+                        Save Resource
+                    </button>
+                    <button class="btn btn-primary btn-sm" onclick="openResourcesPage()">
+                        Full Page
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast notification -->
+    <div id="toast" class="toast"></div>
+
+    <!-- BPMN.js script -->
+    <script src="https://unpkg.com/bpmn-js@17.0.0/dist/bpmn-viewer.development.js"></script>
+
+    <script>
+        // Global variables
+        let processViewer = null;
+        let currentProcessId = null;
+        let currentProcessXML = null;
+        let currentTaskId = null;
+        let currentTaskName = null;
+        let currentTaskType = null;
+        
+        // Timer state
+        let timerState = {
+            isRunning: false,
+            startTime: null,
+            elapsedTime: 0,
+            interval: null,
+            isCollapsed: false,
+            isMinimized: false,
+            sessionId: null
+        };
+
+        // Widget dragging
+        let isDragging = false;
+        let dragOffset = { x: 0, y: 0 };
+        let activeWidget = null;
+
+        // PHP data for JavaScript
+        const processes = <?= json_encode($processes) ?>;
+        const dbError = <?= json_encode($db_error) ?>;
+
+        // Initialize BPMN Viewer
+        function initializeBPMNViewer() {
+            try {
+                processViewer = new BpmnJS({
+                    container: '#process-viewer'
+                });
+                console.log('BPMN Viewer initialized successfully');
+            } catch (error) {
+                console.error('Failed to initialize BPMN Viewer:', error);
+                document.querySelector('#process-viewer .loading').innerHTML = 'BPMN Viewer initialization failed: ' + error.message;
+            }
+        }
+
+        // Load process data into the viewer
+        async function loadProcessInViewer(processId, xml) {
+            if (!processViewer || !xml) return;
+            
+            try {
+                await processViewer.importXML(xml);
+                processViewer.get('canvas').zoom('fit-viewport');
+                
+                currentProcessId = processId;
+                currentProcessXML = xml;
+                
+                // Hide loading indicator
+                const loading = document.querySelector('#process-viewer .loading');
+                if (loading) {
+                    loading.style.display = 'none';
+                }
+                
+                // Add click handlers to BPMN elements
+                addTaskClickHandlers();
+                
+                // Load tasks and allocations
+                loadProcessTasks(processId);
+                loadResourceAllocations(processId);
+                
+                // Update status
+                updateStatusMessage('Process loaded successfully. Click on tasks to interact.');
+                
+            } catch (error) {
+                console.error('Failed to load process in viewer:', error);
+                showToast('Failed to load process: ' + error.message, 'error');
+            }
+        }
+
+        // Add click handlers to BPMN elements
+        function addTaskClickHandlers() {
+            if (!processViewer) return;
+            
+            try {
+                const eventBus = processViewer.get('eventBus');
+                
+                eventBus.on('element.click', function(event) {
+                    const element = event.element;
+                    
+                    // Handle User Tasks for timer functionality
+                    if (element.type === 'bpmn:UserTask') {
+                        handleUserTaskClick(element);
+                    }
+                    // Handle all other tasks/events for resource allocation
+                    else if (element.type === 'bpmn:Task' || 
+                             element.type === 'bpmn:ServiceTask' ||
+                             element.type === 'bpmn:StartEvent' ||
+                             element.type === 'bpmn:EndEvent' ||
+                             element.type === 'bpmn:ExclusiveGateway' ||
+                             element.type === 'bpmn:ParallelGateway') {
+                        handleOtherTaskClick(element);
+                    }
+                });
+                
+            } catch (error) {
+                console.error('Failed to add task click handlers:', error);
+            }
+        }
+
+        // Handle User Task clicks (show timer widget)
+        function handleUserTaskClick(element) {
+            const taskId = element.id;
+            const taskName = element.businessObject.name || element.id;
+            
+            currentTaskId = taskId;
+            currentTaskName = taskName;
+            currentTaskType = 'UserTask';
+            
+            // Close resource widget if open
+            closeResourceWidget();
+            
+            // Show timer widget
+            showTimerWidget(taskId, taskName);
+            
+            // Highlight the selected task
+            highlightElement(element, 'user-task');
+            
+            showToast('Timer widget opened for: ' + taskName, 'info');
+        }
+
+        // Handle other task clicks (show resource widget)
+        function handleOtherTaskClick(element) {
+            const taskId = element.id;
+            const taskName = element.businessObject.name || element.id;
+            const taskType = element.type.replace('bpmn:', '');
+            
+            currentTaskId = taskId;
+            currentTaskName = taskName;
+            currentTaskType = taskType;
+            
+            // Close timer widget if open
+            closeTimer();
+            
+            // Show resource widget
+            showResourceWidget(taskId, taskName, taskType);
+            
+            // Highlight the selected task
+            highlightElement(element, 'other-task');
+            
+            showToast('Resource assignment opened for: ' + taskName, 'info');
+        }
+
+        // Show timer widget for user tasks
+        function showTimerWidget(taskId, taskName) {
+            const widget = document.getElementById('enhanced-timer-widget');
+            document.getElementById('task-name').textContent = taskName;
+            document.getElementById('task-id-display').textContent = 'ID: ' + taskId;
+            document.getElementById('allocation-name').value = taskName + ' Assignment';
+            
+            widget.style.display = 'block';
+            setTimeout(() => {
+                widget.style.opacity = '1';
+                widget.style.transform = 'translateX(0)';
+            }, 10);
+        }
+
+        // Show resource widget for other tasks
+        function showResourceWidget(taskId, taskName, taskType) {
+            const widget = document.getElementById('resource-widget');
+            document.getElementById('resource-task-name').textContent = taskName;
+            document.getElementById('resource-task-id-display').textContent = 'ID: ' + taskId + ' (' + taskType + ')';
+            document.getElementById('resource-widget-allocation').value = taskName + ' Assignment';
+            
+            widget.style.display = 'block';
+            setTimeout(() => {
+                widget.style.opacity = '1';
+                widget.style.transform = 'translateX(0)';
+            }, 10);
+        }
+
+        // Timer functions
+        async function startTimer() {
+            if (timerState.isRunning || !currentTaskId) return;
+            
+            try {
+                const response = await fetch('', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'action=start_timer&process_id=' + currentProcessId + '&task_id=' + currentTaskId
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    timerState.isRunning = true;
+                    timerState.startTime = Date.now();
+                    timerState.sessionId = result.session_id;
+                    
+                    // Update UI
+                    document.getElementById('btn-start').disabled = true;
+                    document.getElementById('btn-stop').disabled = false;
+                    document.getElementById('btn-complete').disabled = false;
+                    document.getElementById('timer-display').classList.add('running');
+                    document.getElementById('status-indicator').classList.remove('stopped');
+                    
+                    // Highlight running task in viewer
+                    if (processViewer && currentTaskId) {
+                        const elementRegistry = processViewer.get('elementRegistry');
+                        const element = elementRegistry.get(currentTaskId);
+                        if (element) {
+                            highlightElement(element, 'running');
+                        }
+                    }
+                    
+                    // Start timer display update
+                    timerState.interval = setInterval(updateTimerDisplay, 1000);
+                    updateTimerDisplay();
+                    
+                    showToast('Timer started successfully!', 'success');
+                    updateStatusMessage('Timer started for: ' + currentTaskName);
+                } else {
+                    showToast('Failed to start timer: ' + result.message, 'error');
+                }
+            } catch (error) {
+                console.error('Timer start error:', error);
+                showToast('Error starting timer', 'error');
+            }
+        }
+
+        async function stopTimer() {
+            if (!timerState.isRunning || !timerState.sessionId) return;
+            
+            try {
+                const response = await fetch('', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'action=stop_timer&session_id=' + timerState.sessionId
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    timerState.isRunning = false;
+                    timerState.elapsedTime = Date.now() - timerState.startTime;
+                    
+                    // Update UI
+                    document.getElementById('btn-start').disabled = false;
+                    document.getElementById('btn-start').innerHTML = 'Resume';
+                    document.getElementById('btn-stop').disabled = true;
+                    document.getElementById('timer-display').classList.remove('running');
+                    document.getElementById('status-indicator').classList.add('stopped');
+                    
+                    // Stop timer display update
+                    clearInterval(timerState.interval);
+                    
+                    // Clear running highlight
+                    if (processViewer && currentTaskId) {
+                        const elementRegistry = processViewer.get('elementRegistry');
+                        const element = elementRegistry.get(currentTaskId);
+                        if (element) {
+                            highlightElement(element, 'user-task');
+                        }
+                    }
+                    
+                    showToast('Timer stopped - you can resume anytime', 'warning');
+                    updateStatusMessage('Timer stopped for: ' + currentTaskName + ' (' + formatTime(timerState.elapsedTime) + ')');
+                } else {
+                    showToast('Failed to stop timer: ' + result.message, 'error');
+                }
+            } catch (error) {
+                console.error('Timer stop error:', error);
+                showToast('Error stopping timer', 'error');
+            }
+        }
+
+        async function completeTimer() {
+            if (!timerState.sessionId) return;
+            
+            try {
+                const finalTime = timerState.isRunning ? Date.now() - timerState.startTime : timerState.elapsedTime;
+                
+                const response = await fetch('', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'action=complete_timer&session_id=' + timerState.sessionId
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Stop timer if running
+                    if (timerState.isRunning) {
+                        clearInterval(timerState.interval);
+                    }
+                    
+                    // Reset timer state
+                    timerState = {
+                        isRunning: false,
+                        startTime: null,
+                        elapsedTime: 0,
+                        interval: null,
+                        isCollapsed: timerState.isCollapsed,
+                        isMinimized: timerState.isMinimized,
+                        sessionId: null
+                    };
+                    
+                    // Reset UI
+                    document.getElementById('timer-display').textContent = '00:00:00';
+                    document.getElementById('timer-display').classList.remove('running');
+                    document.getElementById('btn-start').disabled = false;
+                    document.getElementById('btn-start').innerHTML = 'Start';
+                    document.getElementById('btn-stop').disabled = true;
+                    document.getElementById('btn-complete').disabled = true;
+                    document.getElementById('status-indicator').classList.add('stopped');
+                    
+                    // Clear highlights
+                    clearAllHighlights();
+                    
+                    const formattedTime = formatTime(finalTime);
+                    showToast('Task completed in ' + formattedTime + ' - Great work!', 'success');
+                    updateStatusMessage('Timer completed for: ' + currentTaskName + ' (' + formattedTime + ')');
+                    
+                    // Auto-minimize after completion
+                    setTimeout(() => {
+                        if (!timerState.isMinimized) {
+                            toggleMinimize();
+                        }
+                    }, 2000);
+                } else {
+                    showToast('Failed to complete timer: ' + result.message, 'error');
+                }
+            } catch (error) {
+                console.error('Timer complete error:', error);
+                showToast('Error completing timer', 'error');
+            }
+        }
+
+        function updateTimerDisplay() {
+            if (!timerState.isRunning) return;
+            
+            const elapsed = Date.now() - timerState.startTime;
+            document.getElementById('timer-display').textContent = formatTime(elapsed);
+        }
+
+        function formatTime(milliseconds) {
+            const totalSeconds = Math.floor(milliseconds / 1000);
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+            
+            return hours.toString().padStart(2, '0') + ':' + 
+                   minutes.toString().padStart(2, '0') + ':' + 
+                   seconds.toString().padStart(2, '0');
+        }
+
+        // Resource functions
+        function toggleResources() {
+            const resourceForm = document.getElementById('resource-form');
+            const resourceArrow = document.getElementById('resource-arrow');
+            
+            resourceForm.classList.toggle('expanded');
+            resourceArrow.innerHTML = resourceForm.classList.contains('expanded') ? '▲' : '▼';
+        }
+
+        async function saveResources() {
+            const resourceType = document.getElementById('resource-type').value;
+            const cost = document.getElementById('cost').value;
+            const processingTime = document.getElementById('processing-time').value;
+            const allocationName = document.getElementById('allocation-name').value;
+            const priority = document.getElementById('priority').value;
+            
+            if (!currentProcessId || !currentTaskId) {
+                showToast('Please select a task first', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'action=save_resource_allocation&process_id=' + currentProcessId + 
+                          '&task_id=' + currentTaskId + '&allocation_name=' + encodeURIComponent(allocationName) +
+                          '&resource_type=' + resourceType + '&cost=' + cost + 
+                          '&processing_time=' + processingTime + '&priority=' + priority +
+                          '&notes=' + encodeURIComponent('Saved via timer widget')
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showToast('Resources saved: ' + allocationName + ' ( + cost + ', ' + processingTime + 'min)', 'success');
+                    updateStatusMessage('Resource allocation saved for: ' + currentTaskName);
+                    
+                    // Refresh allocations display
+                    loadResourceAllocations(currentProcessId);
+                    
+                    // Auto-collapse resource form
+                    setTimeout(() => {
+                        document.getElementById('resource-form').classList.remove('expanded');
+                        document.getElementById('resource-arrow').innerHTML = '▼';
+                    }, 1000);
+                } else {
+                    showToast('Failed to save allocation: ' + result.message, 'error');
+                }
+            } catch (error) {
+                console.error('Save allocation error:', error);
+                showToast('Error saving allocation', 'error');
+            }
+        }
+
+        async function saveResourceWidgetData() {
+            const resourceType = document.getElementById('resource-widget-type').value;
+            const cost = document.getElementById('resource-widget-cost').value;
+            const processingTime = document.getElementById('resource-widget-time').value;
+            const allocationName = document.getElementById('resource-widget-allocation').value;
+            const priority = document.getElementById('resource-widget-priority').value;
+            
+            if (!currentProcessId || !currentTaskId) {
+                showToast('Please select a task first', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'action=save_resource_allocation&process_id=' + currentProcessId + 
+                          '&task_id=' + currentTaskId + '&allocation_name=' + encodeURIComponent(allocationName) +
+                          '&resource_type=' + resourceType + '&cost=' + cost + 
+                          '&processing_time=' + processingTime + '&priority=' + priority +
+                          '&notes=' + encodeURIComponent('Saved via resource widget for ' + currentTaskType)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showToast('Resource allocation saved: ' + allocationName, 'success');
+                    updateStatusMessage('Resource allocation saved for: ' + currentTaskName);
+                    
+                    // Refresh allocations display
+                    loadResourceAllocations(currentProcessId);
+                } else {
+                    showToast('Failed to save allocation: ' + result.message, 'error');
+                }
+            } catch (error) {
+                console.error('Save allocation error:', error);
+                showToast('Error saving allocation', 'error');
+            }
+        }
+
+        // Load and display resource allocations
+        async function loadResourceAllocations(processId) {
+            const container = document.getElementById('allocations-list');
+            
+            try {
+                const response = await fetch('', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'action=load_resource_allocations&process_id=' + processId
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    displayResourceAllocations(result.allocations);
+                } else {
+                    console.error('Failed to load allocations:', result.message);
+                }
+            } catch (error) {
+                console.error('Load allocations error:', error);
+            }
+        }
+
+        function displayResourceAllocations(allocations) {
+            const container = document.getElementById('allocations-list');
+            
+            if (allocations.length === 0) {
+                container.innerHTML = '<div class="loading" style="height: 60px; font-size: 12px;">No resource allocations found</div>';
+                return;
+            }
+            
+            let html = '';
+            allocations.forEach(allocation => {
+                const resourceIcon = allocation.resource_type === 'human' ? 'Human' : 
+                                   allocation.resource_type === 'machine' ? 'Machine' : 'Both';
+                
+                html += '<div class="allocation-item">' +
+                        '<div class="allocation-header">' +
+                        '<strong>' + resourceIcon + ': ' + allocation.allocation_name + '</strong>' +
+                        '<span style="color: #666; font-size: 10px;">' + allocation.task_id + '</span>' +
+                        '</div>' +
+                        '<div style="font-size: 11px; color: #666; margin-top: 5px;">' +
+                        '<div>Cost:  + allocation.cost + ' | Time: ' + allocation.processing_time + 'min</div>' +
+                        '<div>Type: ' + allocation.resource_type + '</div>' +
+                        '</div>' +
+                        '</div>';
+            });
+            
+            container.innerHTML = html;
+        }
+
+        // Widget state functions
+        function toggleCollapse() {
+            timerState.isCollapsed = !timerState.isCollapsed;
+            const widget = document.getElementById('enhanced-timer-widget');
+            widget.classList.toggle('collapsed', timerState.isCollapsed);
+        }
+
+        function toggleMinimize() {
+            timerState.isMinimized = !timerState.isMinimized;
+            const widget = document.getElementById('enhanced-timer-widget');
+            widget.classList.toggle('minimized', timerState.isMinimized);
+            
+            if (timerState.isMinimized) {
+                widget.classList.remove('collapsed');
+                timerState.isCollapsed = false;
+            }
+        }
+
+        function closeTimer() {
+            if (timerState.isRunning) {
+                if (!confirm('Timer is still running. Are you sure you want to close it?')) {
+                    return;
+                }
+                clearInterval(timerState.interval);
+            }
+            
+            const widget = document.getElementById('enhanced-timer-widget');
+            widget.style.opacity = '0';
+            widget.style.transform = 'translateX(100%)';
+            
+            setTimeout(() => {
+                widget.style.display = 'none';
+                widget.style.left = '';
+                widget.style.top = '';
+                widget.style.right = '20px';
+                widget.style.transform = '';
+                widget.style.opacity = '';
+                
+                // Reset states
+                widget.classList.remove('collapsed', 'minimized');
+                timerState.isCollapsed = false;
+                timerState.isMinimized = false;
+            }, 300);
+            
+            // Clear highlights
+            clearAllHighlights();
+            currentTaskId = null;
+            currentTaskName = null;
+        }
+
+        function toggleResourceMinimize() {
+            const widget = document.getElementById('resource-widget');
+            widget.classList.toggle('minimized');
+        }
+
+        function closeResourceWidget() {
+            const widget = document.getElementById('resource-widget');
+            widget.style.opacity = '0';
+            widget.style.transform = 'translateX(100%)';
+            
+            setTimeout(() => {
+                widget.style.display = 'none';
+                widget.style.left = '';
+                widget.style.top = '';
+                widget.style.right = '20px';
+                widget.style.transform = '';
+                widget.style.opacity = '';
+            }, 300);
+            
+            // Clear highlights
+            clearAllHighlights();
+            currentTaskId = null;
+            currentTaskName = null;
+        }
+
+        function openResourcesPage() {
+            showToast('Opening full resources page...', 'info');
+        }
+
+        function refreshAllocations() {
+            if (currentProcessId) {
+                loadResourceAllocations(currentProcessId);
+                showToast('Allocations refreshed', 'success');
+            } else {
+                showToast('Please select a process first', 'warning');
+            }
+        }
+
+        // Load process tasks into sidebar
+        function loadProcessTasks(processId) {
+            if (!processViewer) return;
+            
+            try {
+                const elementRegistry = processViewer.get('elementRegistry');
+                const elements = elementRegistry.getAll();
+                
+                // Separate User Tasks and other tasks
+                const userTasks = elements.filter(el => el.type === 'bpmn:UserTask');
+                const otherTasks = elements.filter(el => 
+                    el.type === 'bpmn:Task' || 
+                    el.type === 'bpmn:ServiceTask' ||
+                    el.type === 'bpmn:StartEvent' ||
+                    el.type === 'bpmn:EndEvent' ||
+                    el.type === 'bpmn:ExclusiveGateway' ||
+                    el.type === 'bpmn:ParallelGateway'
+                );
+                
+                // Load user tasks
+                const userTasksList = document.getElementById('user-tasks-list');
+                if (userTasks.length === 0) {
+                    userTasksList.innerHTML = '<div class="loading" style="height: 60px; font-size: 12px;">No user tasks found</div>';
+                } else {
+                    let html = '';
+                    userTasks.forEach(task => {
+                        const name = task.businessObject.name || task.id;
+                        html += '<div class="task-item user-task-item" onclick="handleUserTaskClick({id: \'' + task.id + '\', businessObject: {name: \'' + name + '\'}, type: \'' + task.type + '\'})">' +
+                               '<div><strong>User: ' + name + '</strong></div>' +
+                               '<div style="font-size: 11px; color: #666;">ID: ' + task.id + '</div>' +
+                               '</div>';
+                    });
+                    userTasksList.innerHTML = html;
+                }
+                
+                // Load other tasks
+                const otherTasksList = document.getElementById('other-tasks-list');
+                if (otherTasks.length === 0) {
+                    otherTasksList.innerHTML = '<div class="loading" style="height: 60px; font-size: 12px;">No other tasks found</div>';
+                } else {
+                    let html = '';
+                    otherTasks.forEach(task => {
+                        const name = task.businessObject.name || task.id;
+                        const type = task.type.replace('bpmn:', '');
+                        const icon = getTaskIcon(type);
+                        
+                        html += '<div class="task-item other-task-item" onclick="handleOtherTaskClick({id: \'' + task.id + '\', businessObject: {name: \'' + name + '\'}, type: \'' + task.type + '\'})">' +
+                               '<div><strong>' + icon + ' ' + name + '</strong></div>' +
+                               '<div style="font-size: 11px; color: #666;">' + type + ' | ID: ' + task.id + '</div>' +
+                               '</div>';
+                    });
+                    otherTasksList.innerHTML = html;
+                }
+                
+            } catch (error) {
+                console.error('Failed to load process tasks:', error);
+            }
+        }
+
+        // Get icon for task type
+        function getTaskIcon(type) {
+            const icons = {
+                'StartEvent': 'Start',
+                'EndEvent': 'End',
+                'ExclusiveGateway': 'Gateway',
+                'ParallelGateway': 'Parallel',
+                'ServiceTask': 'Service',
+                'Task': 'Task'
+            };
+            return icons[type] || 'Task';
+        }
+
+        // Highlight BPMN elements
+        function highlightElement(element, type) {
+            // Clear previous highlights
+            clearAllHighlights();
+            
+            if (!processViewer) return;
+            
+            try {
+                const elementRegistry = processViewer.get('elementRegistry');
+                const gfx = elementRegistry.getGraphics(element);
+                
+                if (gfx) {
+                    if (type === 'user-task') {
+                        gfx.classList.add('highlighted-user-task');
+                    } else if (type === 'other-task') {
+                        gfx.classList.add('highlighted-other-task');
+                    } else if (type === 'running') {
+                        gfx.classList.add('running-timer');
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to highlight element:', error);
+            }
+        }
+
+        // Clear all highlights
+        function clearAllHighlights() {
+            if (!processViewer) return;
+            
+            try {
+                const elementRegistry = processViewer.get('elementRegistry');
+                const elements = elementRegistry.getAll();
+                
+                elements.forEach(element => {
+                    const gfx = elementRegistry.getGraphics(element);
+                    if (gfx) {
+                        gfx.classList.remove('highlighted-user-task', 'highlighted-other-task', 'running-timer');
+                    }
+                });
+            } catch (error) {
+                console.error('Failed to clear highlights:', error);
+            }
+        }
+
+        // Utility functions
+        function updateStatusMessage(message) {
+            document.getElementById('status-message').textContent = message;
+        }
+
+        function showToast(message, type) {
+            const toast = document.getElementById('toast');
+            
+            const colors = {
+                success: '#00b894',
+                warning: '#fdcb6e',
+                error: '#d63031',
+                info: '#1E88E5'
+            };
+            
+            toast.style.background = colors[type] || colors.info;
+            toast.textContent = message;
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // Dragging functionality for both widgets
+        function initializeDragging() {
+            const timerHeader = document.getElementById('timer-header');
+            const resourceHeader = document.getElementById('resource-header');
+            
+            if (timerHeader) {
+                timerHeader.addEventListener('mousedown', (e) => startDrag(e, 'timer'));
+            }
+            
+            if (resourceHeader) {
+                resourceHeader.addEventListener('mousedown', (e) => startDrag(e, 'resource'));
+            }
+            
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', stopDrag);
+        }
+
+        function startDrag(e, widgetType) {
+            if (e.target.closest('.header-btn')) return;
+            
+            isDragging = true;
+            activeWidget = widgetType;
+            
+            const widget = widgetType === 'timer' ? 
+                document.getElementById('enhanced-timer-widget') : 
+                document.getElementById('resource-widget');
+            
+            widget.classList.add('dragging');
+            
+            const rect = widget.getBoundingClientRect();
+            dragOffset.x = e.clientX - rect.left;
+            dragOffset.y = e.clientY - rect.top;
+            
+            e.preventDefault();
+        }
+
+        function drag(e) {
+            if (!isDragging || !activeWidget) return;
+            
+            const widget = activeWidget === 'timer' ? 
+                document.getElementById('enhanced-timer-widget') : 
+                document.getElementById('resource-widget');
+            
+            const x = e.clientX - dragOffset.x;
+            const y = e.clientY - dragOffset.y;
+            
+            const maxX = window.innerWidth - widget.offsetWidth;
+            const maxY = window.innerHeight - widget.offsetHeight;
+            
+            const boundedX = Math.max(0, Math.min(x, maxX));
+            const boundedY = Math.max(0, Math.min(y, maxY));
+            
+            widget.style.left = boundedX + 'px';
+            widget.style.top = boundedY + 'px';
+            widget.style.right = 'auto';
+        }
+
+        function stopDrag() {
+            if (!isDragging || !activeWidget) return;
+            
+            const widget = activeWidget === 'timer' ? 
+                document.getElementById('enhanced-timer-widget') : 
+                document.getElementById('resource-widget');
+            
+            widget.classList.remove('dragging');
+            isDragging = false;
+            activeWidget = null;
+        }
+
+        // Check for active timer on page load
+        async function checkActiveTimer() {
+            if (dbError) return;
+            
+            try {
+                const response = await fetch('', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'action=get_active_timer'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success && result.timer) {
+                    const timer = result.timer;
+                    timerState.sessionId = timer.id;
+                    timerState.startTime = Date.now() - (timer.elapsed_seconds * 1000);
+                    timerState.isRunning = true;
+                    currentTaskId = timer.task_id;
+                    
+                    // Update UI if timer widget is shown
+                    const timerWidget = document.getElementById('enhanced-timer-widget');
+                    if (timerWidget.style.display === 'block') {
+                        document.getElementById('btn-start').disabled = true;
+                        document.getElementById('btn-stop').disabled = false;
+                        document.getElementById('btn-complete').disabled = false;
+                        document.getElementById('timer-display').classList.add('running');
+                        document.getElementById('status-indicator').classList.remove('stopped');
+                        
+                        timerState.interval = setInterval(updateTimerDisplay, 1000);
+                        updateTimerDisplay();
+                        
+                        if (currentProcessId && timer.process_id == currentProcessId) {
+                            const elementRegistry = processViewer.get('elementRegistry');
+                            const element = elementRegistry.get(timer.task_id);
+                            if (element) {
+                                highlightElement(element, 'running');
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to check active timer:', error);
+            }
+        }
+
+        // Initialize everything when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('MACTA Process Setup initialized');
+            
+            if (dbError) {
+                updateStatusMessage('Database Error: ' + dbError);
+                return;
+            }
+            
+            // Initialize BPMN viewer
+            initializeBPMNViewer();
+            
+            // Initialize dragging
+            initializeDragging();
+            
+            // Process selector change handler
+            document.getElementById('process-select').addEventListener('change', async (e) => {
+                const selectedValue = e.target.value;
+                
+                if (selectedValue) {
+                    const selectedOption = e.target.selectedOptions[0];
+                    const xmlData = selectedOption.dataset.xml;
+                    
+                    if (xmlData) {
+                        await loadProcessInViewer(selectedValue, xmlData);
+                    }
+                } else {
+                    // Clear viewer
+                    currentProcessId = null;
+                    currentProcessXML = null;
+                    
+                    const loading = document.querySelector('#process-viewer .loading');
+                    if (loading) {
+                        loading.style.display = 'flex';
+                        loading.innerHTML = 'Select a process from the dropdown above to view it here...';
+                    }
+                    
+                    // Clear sidebar content
+                    document.getElementById('user-tasks-list').innerHTML = '<div class="loading" style="height: 100px; font-size: 12px;">Select a process to view user tasks</div>';
+                    document.getElementById('other-tasks-list').innerHTML = '<div class="loading" style="height: 100px; font-size: 12px;">Select a process to view other tasks</div>';
+                    document.getElementById('allocations-list').innerHTML = '<div class="loading" style="height: 100px; font-size: 12px;">Select a process to view allocations</div>';
+                    
+                    updateStatusMessage('Select a process to begin setup and resource allocation.');
+                }
+            });
+            
+            // Check for active timer
+            checkActiveTimer();
+            
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                const timerWidget = document.getElementById('enhanced-timer-widget');
+                const resourceWidget = document.getElementById('resource-widget');
+                
+                if (timerWidget.style.display === 'block' || resourceWidget.style.display === 'block') {
+                    if (e.key === ' ' && (e.ctrlKey || e.metaKey)) {
+                        e.preventDefault();
+                        if (timerState.isRunning) {
+                            stopTimer();
+                        } else if (currentTaskType === 'UserTask') {
+                            startTimer();
+                        }
+                    }
+                    
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                        e.preventDefault();
+                        if (timerState.isRunning || timerState.elapsedTime > 0) {
+                            completeTimer();
+                        }
+                    }
+                    
+                    if (e.key === 'Escape') {
+                        e.preventDefault();
+                        if (timerWidget.style.display === 'block') {
+                            toggleMinimize();
+                        }
+                        if (resourceWidget.style.display === 'block') {
+                            toggleResourceMinimize();
+                        }
+                    }
+                }
+            });
+            
+            console.log('All event listeners attached successfully!');
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            const timerWidget = document.getElementById('enhanced-timer-widget');
+            const resourceWidget = document.getElementById('resource-widget');
+            
+            [timerWidget, resourceWidget].forEach(widget => {
+                if (widget.style.left) {
+                    const rect = widget.getBoundingClientRect();
+                    if (rect.right > window.innerWidth || rect.bottom > window.innerHeight) {
+                        widget.style.left = '';
+                        widget.style.top = '';
+                        widget.style.right = '20px';
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
