@@ -1,0 +1,1489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BPMN Process Documentation Generator</title>
+    <script src="https://unpkg.com/bpmn-js@17.7.1/dist/bpmn-viewer.development.js"></script>
+    <style>
+        :root {
+            --macta-orange: #FF6B35;
+            --macta-blue: #004E89;
+            --macta-light-blue: #1A659E;
+            --macta-gray: #F5F5F5;
+            --macta-dark-gray: #333;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: var(--macta-dark-gray);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: var(--macta-orange);
+            color: white;
+            text-align: center;
+            padding: 40px 20px;
+            border-radius: 15px 15px 0 0;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            background: white;
+            border-radius: 0 0 15px 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .upload-section {
+            padding: 40px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            align-items: start;
+        }
+
+        .upload-area {
+            border: 3px dashed #ddd;
+            border-radius: 15px;
+            padding: 60px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #fafafa;
+        }
+
+        .upload-area:hover {
+            border-color: var(--macta-orange);
+            background: #fff;
+        }
+
+        .file-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+        }
+
+        .upload-text {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: var(--macta-dark-gray);
+        }
+
+        .upload-subtext {
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            background: var(--macta-orange);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            background: #e55a2b;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+        }
+
+        .btn-primary {
+            background: var(--macta-blue);
+            font-size: 1.1rem;
+            padding: 15px 30px;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .btn-primary:hover {
+            background: var(--macta-light-blue);
+        }
+
+        .settings-panel {
+            background: var(--macta-gray);
+            padding: 30px;
+            border-radius: 15px;
+        }
+
+        .settings-panel h3 {
+            color: var(--macta-blue);
+            margin-bottom: 25px;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--macta-dark-gray);
+        }
+
+        .form-group select,
+        .form-group input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group select:focus,
+        .form-group input[type="text"]:focus {
+            outline: none;
+            border-color: var(--macta-orange);
+        }
+
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--macta-orange);
+        }
+
+        .status-message {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-weight: 600;
+        }
+
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--macta-orange);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .diagram-container {
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            height: 600px;
+            width: 100%;
+            margin: 20px 0;
+            position: relative;
+            display: none;
+        }
+
+        .diagram-container.show {
+            display: block;
+        }
+
+        /* BPMN Overlay Styles */
+        .bpmn-step-overlay {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: bold;
+            border: 2px solid white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .bpmn-step-overlay:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        }
+
+        .step-overlay-activity {
+            background: var(--macta-orange);
+            color: white;
+        }
+
+        .step-overlay-decision {
+            background: #ffc107;
+            color: #333;
+        }
+
+        .step-overlay-start {
+            background: #28a745;
+            color: white;
+        }
+
+        .step-overlay-end {
+            background: #dc3545;
+            color: white;
+        }
+
+        .preview-section {
+            display: none;
+            padding: 40px;
+            border-top: 3px solid var(--macta-gray);
+        }
+
+        .preview-section.show {
+            display: block;
+        }
+
+        .doc-section {
+            margin-bottom: 40px;
+        }
+
+        .doc-section h2 {
+            color: var(--macta-blue);
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--macta-orange);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .step-item {
+            background: #f8f9fa;
+            border-left: 4px solid var(--macta-orange);
+            padding: 20px;
+            margin-bottom: 15px;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .step-number {
+            background: var(--macta-orange);
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+        }
+
+        .decision-item {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .decision-number {
+            background: #ffc107;
+            color: #333;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-top: 4px solid var(--macta-orange);
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: var(--macta-orange);
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .export-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 30px;
+            flex-wrap: wrap;
+        }
+
+        .export-btn {
+            background: var(--macta-blue);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .export-btn:hover {
+            background: var(--macta-light-blue);
+            transform: translateY(-2px);
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            position: relative;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            color: var(--macta-blue);
+            margin: 0;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        .modal-body {
+            margin-bottom: 20px;
+        }
+
+        .modal-field {
+            margin-bottom: 15px;
+        }
+
+        .modal-field strong {
+            color: var(--macta-dark-gray);
+        }
+
+        .modal-footer {
+            text-align: center;
+        }
+
+        .modal-btn {
+            background: var(--macta-orange);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: 600;
+        }
+
+        .modal-btn:hover {
+            background: #e55a2b;
+        }
+
+        @media (max-width: 768px) {
+            .upload-section {
+                grid-template-columns: 1fr;
+                gap: 30px;
+            }
+            
+            .checkbox-group {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .export-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 BPMN Process Documentation Generator</h1>
+            <p>Transform BPMN diagrams into comprehensive, professional procedure documents</p>
+        </div>
+
+        <div class="main-content">
+            <div class="upload-section">
+                <div class="upload-area" id="uploadArea">
+                    <div class="file-icon">📁</div>
+                    <div class="upload-text">Drop your BPMN file here</div>
+                    <div class="upload-subtext">or click to browse (.bpmn, .xml files)</div>
+                    <input type="file" id="fileInput" accept=".bpmn,.xml">
+                    <button type="button" class="btn" id="chooseFileBtn">Choose File</button>
+                </div>
+
+                <div class="settings-panel">
+                    <h3>⚙️ Documentation Settings</h3>
+                    
+                    <div class="form-group">
+                        <label for="templateSelect">Documentation Template</label>
+                        <select id="templateSelect">
+                            <option value="standard">Standard Business Process</option>
+                            <option value="detailed">Detailed Technical Process</option>
+                            <option value="executive">Executive Summary</option>
+                            <option value="training">Training Manual</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="detailLevel">Detail Level</label>
+                        <select id="detailLevel">
+                            <option value="high">High Detail</option>
+                            <option value="medium">Medium Detail</option>
+                            <option value="summary">Summary Only</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Include Sections</label>
+                        <div class="checkbox-group">
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="includeOverview" checked>
+                                <label for="includeOverview">📋 Process Overview</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="includeSteps" checked>
+                                <label for="includeSteps">📝 Step-by-Step Procedures</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="includeDecisions" checked>
+                                <label for="includeDecisions">🔀 Decision Points</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="includeStats" checked>
+                                <label for="includeStats">📊 Process Statistics</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="companyName">Company/Organization Name</label>
+                        <input type="text" id="companyName" placeholder="Enter your organization name">
+                    </div>
+
+                    <button type="button" class="btn btn-primary" id="generateBtn">🚀 Generate Documentation</button>
+                </div>
+            </div>
+
+            <div class="loading" id="loadingDiv">
+                <div class="spinner"></div>
+                <p>Processing your BPMN file...</p>
+            </div>
+
+            <div id="statusMessage"></div>
+
+            <!-- BPMN Diagram Container -->
+            <div class="diagram-container" id="diagramContainer">
+                <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666;">
+                    No diagram loaded. Please upload a BPMN file.
+                </div>
+            </div>
+
+            <div class="preview-section" id="previewSection">
+                <div id="documentationContent"></div>
+                <div class="export-buttons">
+                    <button class="export-btn" onclick="exportToPDF()">📄 Export to PDF</button>
+                    <button class="export-btn" onclick="exportToWord()">📝 Export to Word</button>
+                    <button class="export-btn" onclick="exportToHTML()">🌐 Export to HTML</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentBpmnData = null;
+        let currentDocumentation = null;
+        let bpmnParser = null;
+        let bpmnViewer = null;
+        let elementRegistry = null;
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeBpmnParser();
+            setupEventListeners();
+        });
+
+        function initializeBpmnParser() {
+            // Enhanced BPMN parser with actual data extraction
+            bpmnParser = {
+                parseBpmnXml: async function(xmlContent) {
+                    try {
+                        // Simulate parsing delay
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        
+                        // Parse XML
+                        const parser = new DOMParser();
+                        const xmlDoc = parser.parseFromString(xmlContent, "text/xml");
+                        
+                        // Check for parsing errors
+                        const parseError = xmlDoc.querySelector('parsererror');
+                        if (parseError) {
+                            throw new Error('Invalid XML format');
+                        }
+                        
+                        // Extract elements with actual data
+                        const tasks = this.extractTasks(xmlDoc);
+                        const gateways = this.extractGateways(xmlDoc);
+                        const startEvents = this.extractStartEvents(xmlDoc);
+                        const endEvents = this.extractEndEvents(xmlDoc);
+                        const sequenceFlows = this.extractSequenceFlows(xmlDoc);
+                        
+                        return {
+                            success: true,
+                            tasks: tasks,
+                            gateways: gateways,
+                            startEvents: startEvents,
+                            endEvents: endEvents,
+                            sequenceFlows: sequenceFlows,
+                            processName: this.extractProcessName(xmlDoc),
+                            xmlContent: xmlContent
+                        };
+                    } catch (error) {
+                        return {
+                            success: false,
+                            error: error.message
+                        };
+                    }
+                },
+
+                extractTasks: function(xmlDoc) {
+                    const taskSelectors = ['task', 'userTask', 'serviceTask', 'scriptTask', 'businessRuleTask', 'manualTask'];
+                    const tasks = [];
+                    
+                    taskSelectors.forEach(selector => {
+                        const elements = xmlDoc.querySelectorAll(selector);
+                        elements.forEach(task => {
+                            tasks.push({
+                                id: task.getAttribute('id'),
+                                name: task.getAttribute('name') || 'Unnamed Task',
+                                type: task.tagName,
+                                documentation: this.extractDocumentation(task)
+                            });
+                        });
+                    });
+                    
+                    return tasks;
+                },
+
+                extractGateways: function(xmlDoc) {
+                    const gatewaySelectors = ['exclusiveGateway', 'inclusiveGateway', 'parallelGateway', 'eventBasedGateway'];
+                    const gateways = [];
+                    
+                    gatewaySelectors.forEach(selector => {
+                        const elements = xmlDoc.querySelectorAll(selector);
+                        elements.forEach(gateway => {
+                            const outgoingFlows = this.extractOutgoingFlows(gateway);
+                            const incomingFlows = this.extractIncomingFlows(gateway);
+                            
+                            // Determine if this is a decision point (split) or join
+                            const isDecisionPoint = outgoingFlows.length > 1;
+                            const isJoin = incomingFlows.length > 1 && outgoingFlows.length <= 1;
+                            
+                            gateways.push({
+                                id: gateway.getAttribute('id'),
+                                name: gateway.getAttribute('name') || (isDecisionPoint ? 'Decision Point' : isJoin ? 'Join Point' : 'Gateway'),
+                                type: gateway.tagName,
+                                documentation: this.extractDocumentation(gateway),
+                                outgoingFlows: outgoingFlows,
+                                incomingFlows: incomingFlows,
+                                isDecisionPoint: isDecisionPoint,
+                                isJoin: isJoin
+                            });
+                        });
+                    });
+                    
+                    return gateways;
+                },
+
+                extractStartEvents: function(xmlDoc) {
+                    const events = [];
+                    const elements = xmlDoc.querySelectorAll('startEvent');
+                    
+                    elements.forEach(event => {
+                        events.push({
+                            id: event.getAttribute('id'),
+                            name: event.getAttribute('name') || 'Start',
+                            documentation: this.extractDocumentation(event)
+                        });
+                    });
+                    
+                    return events;
+                },
+
+                extractEndEvents: function(xmlDoc) {
+                    const events = [];
+                    const elements = xmlDoc.querySelectorAll('endEvent');
+                    
+                    elements.forEach(event => {
+                        events.push({
+                            id: event.getAttribute('id'),
+                            name: event.getAttribute('name') || 'End',
+                            documentation: this.extractDocumentation(event)
+                        });
+                    });
+                    
+                    return events;
+                },
+
+                extractSequenceFlows: function(xmlDoc) {
+                    const flows = [];
+                    const elements = xmlDoc.querySelectorAll('sequenceFlow');
+                    
+                    elements.forEach(flow => {
+                        flows.push({
+                            id: flow.getAttribute('id'),
+                            name: flow.getAttribute('name') || '',
+                            sourceRef: flow.getAttribute('sourceRef'),
+                            targetRef: flow.getAttribute('targetRef'),
+                            conditionExpression: this.extractConditionExpression(flow)
+                        });
+                    });
+                    
+                    return flows;
+                },
+
+                extractDocumentation: function(element) {
+                    const docElement = element.querySelector('documentation');
+                    return docElement ? docElement.textContent.trim() : '';
+                },
+
+                extractConditionExpression: function(flow) {
+                    const conditionElement = flow.querySelector('conditionExpression');
+                    return conditionElement ? conditionElement.textContent.trim() : '';
+                },
+
+                extractOutgoingFlows: function(gateway) {
+                    const outgoing = gateway.querySelectorAll('outgoing');
+                    return Array.from(outgoing).map(out => out.textContent.trim());
+                },
+
+                extractIncomingFlows: function(gateway) {
+                    const incoming = gateway.querySelectorAll('incoming');
+                    return Array.from(incoming).map(inc => inc.textContent.trim());
+                },
+
+                extractProcessName: function(xmlDoc) {
+                    const process = xmlDoc.querySelector('process');
+                    return process ? (process.getAttribute('name') || 'Business Process') : 'Business Process';
+                }
+            };
+        }
+
+        function setupEventListeners() {
+            const fileInput = document.getElementById('fileInput');
+            const uploadArea = document.getElementById('uploadArea');
+            const generateBtn = document.getElementById('generateBtn');
+            const chooseFileBtn = document.getElementById('chooseFileBtn');
+
+            // File input change
+            fileInput.addEventListener('change', handleFileSelect);
+            
+            // Choose file button
+            chooseFileBtn.addEventListener('click', () => fileInput.click());
+
+            // Drag and drop
+            uploadArea.addEventListener('dragover', handleDragOver);
+            uploadArea.addEventListener('drop', handleDrop);
+            uploadArea.addEventListener('click', () => fileInput.click());
+
+            // Generate documentation
+            generateBtn.addEventListener('click', generateDocumentation);
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.currentTarget.style.background = '#fff';
+            e.currentTarget.style.borderColor = 'var(--macta-orange)';
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                processFile(files[0]);
+            }
+            
+            e.currentTarget.style.background = '';
+            e.currentTarget.style.borderColor = '';
+        }
+
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (file) {
+                processFile(file);
+            }
+        }
+
+        async function processFile(file) {
+            if (!file.name.toLowerCase().endsWith('.bpmn') && !file.name.toLowerCase().endsWith('.xml')) {
+                showStatus('Please select a valid BPMN file (.bpmn or .xml)', 'error');
+                return;
+            }
+
+            try {
+                showLoading(true);
+                showStatus('Processing BPMN file...', 'info');
+
+                const fileContent = await readFileContent(file);
+                
+                // Parse BPMN data
+                let parseResult = await bpmnParser.parseBpmnXml(fileContent);
+                
+                if (!parseResult.success) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    parseResult = await bpmnParser.parseBpmnXml(fileContent);
+                }
+                
+                if (parseResult.success) {
+                    currentBpmnData = parseResult;
+                    window.rawBpmnXml = fileContent;
+                    
+                    // Load BPMN diagram
+                    await loadBpmnDiagram(fileContent);
+                    
+                    const successMsg = 'BPMN file processed successfully! Found ' + parseResult.tasks.length + ' tasks, ' + parseResult.gateways.length + ' gateways, ' + parseResult.startEvents.length + ' start events, and ' + parseResult.endEvents.length + ' end events.';
+                    showStatus(successMsg, 'success');
+                    
+                    updateUploadSection(file.name, parseResult);
+                } else {
+                    showStatus('Failed to parse BPMN file: ' + parseResult.error, 'error');
+                }
+                
+            } catch (error) {
+                console.error('File processing error:', error);
+                showStatus('Error processing file: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function loadBpmnDiagram(xmlContent) {
+            const diagramContainer = document.getElementById('diagramContainer');
+            
+            if (!diagramContainer) {
+                console.warn('Diagram container not found');
+                return;
+            }
+            
+            // Show the diagram container
+            diagramContainer.classList.add('show');
+            
+            // Clear container
+            diagramContainer.innerHTML = '';
+
+            // Clean up previous viewer
+            if (bpmnViewer) {
+                try {
+                    bpmnViewer.destroy();
+                } catch (e) {
+                    console.log('Cleanup error:', e);
+                }
+                bpmnViewer = null;
+            }
+
+            // Create new viewer
+            bpmnViewer = new BpmnJS({
+                container: diagramContainer,
+                width: '100%',
+                height: '600px'
+            });
+
+            // Import XML
+            try {
+                const result = await bpmnViewer.importXML(xmlContent);
+                console.log('BPMN import result:', result);
+                
+                // Store element registry for later use
+                elementRegistry = bpmnViewer.get('elementRegistry');
+                
+                // Fit to viewport
+                setTimeout(() => {
+                    try {
+                        const canvas = bpmnViewer.get('canvas');
+                        canvas.zoom('fit-viewport', 'auto');
+                        console.log('Diagram fitted to viewport');
+                        
+                        // Add interactive overlays
+                        setTimeout(() => {
+                            addInteractiveOverlays();
+                        }, 500);
+                    } catch (error) {
+                        console.error('Canvas error:', error);
+                        addInteractiveOverlays(); // Try anyway
+                    }
+                }, 300);
+                
+            } catch (error) {
+                console.error('BPMN import error:', error);
+                diagramContainer.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666;">Failed to load BPMN diagram: ' + error.message + '</div>';
+            }
+        }
+
+        function addInteractiveOverlays() {
+            if (!bpmnViewer || !currentBpmnData) return;
+            
+            try {
+                const elementRegistry = bpmnViewer.get('elementRegistry');
+                const overlays = bpmnViewer.get('overlays');
+                
+                // Clear existing overlays
+                overlays.clear();
+                
+                // Get all flow elements
+                const flowElements = elementRegistry.getAll().filter(el => 
+                    el.businessObject && 
+                    el.type !== 'label' && 
+                    (el.type.includes('Task') || 
+                     el.type.includes('Event') || 
+                     el.type.includes('Gateway'))
+                );
+
+                console.log('Found flow elements for overlays:', flowElements.length);
+
+                // Add overlays with actual data
+                flowElements.forEach((element, index) => {
+                    let overlayClass = 'step-overlay-activity';
+                    let content = (index + 1).toString();
+                    let elementData = null;
+                    
+                    // Find corresponding data
+                    if (element.type.includes('StartEvent')) {
+                        overlayClass = 'step-overlay-start';
+                        content = 'S';
+                        elementData = currentBpmnData.startEvents.find(e => e.id === element.id);
+                    } else if (element.type.includes('EndEvent')) {
+                        overlayClass = 'step-overlay-end';
+                        content = 'E';
+                        elementData = currentBpmnData.endEvents.find(e => e.id === element.id);
+                    } else if (element.type.includes('Gateway')) {
+                        overlayClass = 'step-overlay-decision';
+                        content = '?';
+                        elementData = currentBpmnData.gateways.find(g => g.id === element.id);
+                    } else if (element.type.includes('Task')) {
+                        elementData = currentBpmnData.tasks.find(t => t.id === element.id);
+                    }
+
+                    const title = elementData ? elementData.name : element.businessObject.name || 'Step ' + (index + 1);
+                    const description = elementData ? elementData.documentation : '';
+
+                    const overlayHtml = `
+                        <div class="bpmn-step-overlay ${overlayClass}" 
+                             title="${title}" 
+                             onclick="showElementDetails('${element.id}', '${title.replace(/'/g, '\\\'').replace(/"/g, '&quot;')}', '${description.replace(/'/g, '\\\'').replace(/"/g, '&quot;')}', '${element.type}', ${index + 1})"
+                             style="cursor: pointer;">
+                            ${content}
+                        </div>
+                    `;
+
+                    overlays.add(element, 'step-overlay', {
+                        position: {
+                            top: -15,
+                            right: -15
+                        },
+                        html: overlayHtml
+                    });
+                });
+
+                showStatus('✅ Added ' + flowElements.length + ' interactive overlays to diagram', 'success');
+                
+            } catch (error) {
+                console.error('Error adding overlays:', error);
+                showStatus('⚠️ Overlays could not be added: ' + error.message, 'error');
+            }
+        }
+
+        function showElementDetails(elementId, title, description, type, stepNumber) {
+            // Find detailed element data from the actual BPMN viewer
+            let elementData = null;
+            let conditions = [];
+            let actualDescription = description;
+            
+            // Get the actual element from the BPMN viewer
+            if (elementRegistry) {
+                const element = elementRegistry.get(elementId);
+                if (element && element.businessObject) {
+                    const businessObject = element.businessObject;
+                    
+                    // Extract actual documentation
+                    if (businessObject.documentation && businessObject.documentation.length > 0) {
+                        actualDescription = businessObject.documentation[0].text || description;
+                    }
+                    
+                    // For gateways, get actual conditions from outgoing flows
+                    if (type.includes('Gateway')) {
+                        elementData = currentBpmnData.gateways.find(g => g.id === elementId);
+                        if (elementData && currentBpmnData.sequenceFlows) {
+                            conditions = currentBpmnData.sequenceFlows
+                                .filter(flow => flow.sourceRef === elementId && flow.name)
+                                .map(flow => flow.name);
+                        }
+                        
+                        // If no conditions found, try to get from business object
+                        if (conditions.length === 0 && businessObject.outgoing) {
+                            businessObject.outgoing.forEach(outgoing => {
+                                if (outgoing.name) {
+                                    conditions.push(outgoing.name);
+                                }
+                            });
+                        }
+                    } else if (type.includes('Task')) {
+                        elementData = currentBpmnData.tasks.find(t => t.id === elementId);
+                    } else if (type.includes('StartEvent')) {
+                        elementData = currentBpmnData.startEvents.find(e => e.id === elementId);
+                    } else if (type.includes('EndEvent')) {
+                        elementData = currentBpmnData.endEvents.find(e => e.id === elementId);
+                    }
+                }
+            }
+
+            // Create and show modal
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 class="modal-title">Step ${stepNumber}: ${title}</h3>
+                        <button class="modal-close" onclick="closeModal(this)">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="modal-field">
+                            <strong>Type:</strong> ${type.replace(/([A-Z])/g, ' $1').trim()}
+                        </div>
+                        ${actualDescription ? `<div class="modal-field"><strong>Description:</strong> ${actualDescription}</div>` : ''}
+                        ${conditions.length > 0 ? `<div class="modal-field"><strong>Conditions:</strong> ${conditions.join(', ')}</div>` : ''}
+                        <div class="modal-field">
+                            <strong>Element ID:</strong> ${elementId}
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="modal-btn" onclick="closeModal(this)">Close</button>
+                    </div>
+                </div>
+            `;
+            
+            // Add click outside to close
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    closeModal(modal);
+                }
+            });
+            
+            document.body.appendChild(modal);
+        }
+
+        function closeModal(element) {
+            // Find the modal overlay (either the element itself or its parent)
+            let modal = element;
+            while (modal && !modal.classList.contains('modal-overlay')) {
+                modal = modal.parentElement;
+            }
+            
+            if (modal) {
+                modal.remove();
+            }
+        }
+
+        function readFileContent(file) {
+            return new Promise(function(resolve, reject) {
+                const reader = new FileReader();
+                reader.onload = function(e) { resolve(e.target.result); };
+                reader.onerror = function(e) { reject(new Error('Failed to read file')); };
+                reader.readAsText(file);
+            });
+        }
+
+        function updateUploadSection(fileName, parseResult) {
+            const uploadArea = document.getElementById('uploadArea');
+            const icon = '<div class="file-icon">✅</div>';
+            const text = '<div class="upload-text">' + fileName + '</div>';
+            const subtext = '<div class="upload-subtext">' + parseResult.tasks.length + ' tasks, ' + parseResult.gateways.length + ' gateways, ' + parseResult.startEvents.length + ' start events, ' + parseResult.endEvents.length + ' end events</div>';
+            const button = '<button type="button" class="btn" onclick="chooseNewFile()">Choose Different File</button>';
+            
+            uploadArea.innerHTML = icon + text + subtext + button;
+        }
+
+        function chooseNewFile() {
+            document.getElementById('fileInput').value = '';
+            document.getElementById('fileInput').click();
+        }
+
+        async function generateDocumentation() {
+            if (!currentBpmnData) {
+                showStatus('Please upload and parse a BPMN file first.', 'error');
+                return;
+            }
+
+            try {
+                showLoading(true);
+                showStatus('Generating procedure documentation...', 'info');
+
+                // Generate documentation from actual BPMN data
+                const documentation = generateDocumentationFromBpmn(currentBpmnData);
+                
+                currentDocumentation = documentation;
+                displayDocumentation(documentation);
+                showStatus('Documentation generated successfully!', 'success');
+                
+            } catch (error) {
+                console.error('Documentation generation error:', error);
+                showStatus('Error generating documentation: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function generateDocumentationFromBpmn(bpmnData) {
+            const companyName = document.getElementById('companyName').value || 'Your Organization';
+            
+            // Generate procedure steps from actual BPMN data in logical order
+            const procedureSteps = [];
+            let stepNumber = 1;
+            
+            // Add start events
+            bpmnData.startEvents.forEach(event => {
+                procedureSteps.push({
+                    number: stepNumber++,
+                    title: event.name,
+                    description: event.documentation || 'Process initiation step',
+                    responsible: 'Process Initiator',
+                    estimatedTime: '5 minutes',
+                    type: 'start',
+                    elementId: event.id
+                });
+            });
+            
+            // Add tasks
+            bpmnData.tasks.forEach(task => {
+                const actualDescription = task.documentation || 'Execute the task as defined in the process';
+                const responsible = determineResponsible(task);
+                
+                procedureSteps.push({
+                    number: stepNumber++,
+                    title: task.name,
+                    description: actualDescription,
+                    responsible: responsible,
+                    estimatedTime: estimateTaskTime(task),
+                    type: 'task',
+                    elementId: task.id
+                });
+            });
+            
+            // Add end events
+            bpmnData.endEvents.forEach(event => {
+                procedureSteps.push({
+                    number: stepNumber++,
+                    title: event.name,
+                    description: event.documentation || 'Process completion step',
+                    responsible: 'System/Process Owner',
+                    estimatedTime: '2 minutes',
+                    type: 'end',
+                    elementId: event.id
+                });
+            });
+            
+            // Generate decision points from gateways (exclude joins)
+            const decisionPoints = bpmnData.gateways
+                .filter(gateway => gateway.isDecisionPoint && !gateway.isJoin) // Only decision points, not joins
+                .map((gateway, index) => {
+                    const conditions = bpmnData.sequenceFlows
+                        .filter(flow => flow.sourceRef === gateway.id && flow.name)
+                        .map(flow => flow.name);
+                    
+                    const actions = conditions.map(condition => `Proceed to: ${condition} path`);
+                    
+                    // Get actual description
+                    let actualDescription = gateway.documentation || 'Decision point in the process flow';
+                    
+                    // Add specific descriptions for parallel gateways
+                    if (gateway.type === 'parallelGateway') {
+                        actualDescription = gateway.documentation || 'Parallel execution point - multiple paths can be executed simultaneously';
+                    } else if (gateway.type === 'exclusiveGateway') {
+                        actualDescription = gateway.documentation || 'Exclusive decision point - only one path can be taken based on conditions';
+                    } else if (gateway.type === 'inclusiveGateway') {
+                        actualDescription = gateway.documentation || 'Inclusive decision point - one or more paths can be taken based on conditions';
+                    }
+                    
+                    return {
+                        number: index + 1,
+                        title: gateway.name,
+                        description: actualDescription,
+                        conditions: conditions.length > 0 ? conditions : ['Multiple conditions possible'],
+                        actions: actions.length > 0 ? actions : ['Multiple actions possible'],
+                        type: gateway.type || 'exclusiveGateway',
+                        elementId: gateway.id
+                    };
+                });
+            
+            return {
+                processOverview: {
+                    name: bpmnData.processName || 'Business Process',
+                    description: 'Generated from BPMN diagram with actual element data and documentation',
+                    totalSteps: procedureSteps.length,
+                    decisionPoints: decisionPoints.length,
+                    estimatedDuration: calculateTotalDuration(procedureSteps),
+                    complexity: determineComplexity(procedureSteps.length, decisionPoints.length)
+                },
+                procedureSteps: procedureSteps,
+                decisionPoints: decisionPoints
+            };
+        }
+
+        function determineResponsible(task) {
+            // Determine responsible party based on task type and name
+            if (task.type === 'userTask') return 'User/Operator';
+            if (task.type === 'serviceTask') return 'System/Service';
+            if (task.type === 'scriptTask') return 'System/Automation';
+            if (task.type === 'businessRuleTask') return 'Business Rules Engine';
+            if (task.type === 'manualTask') return 'Manual Operator';
+            
+            // Default based on task name patterns
+            const taskName = task.name.toLowerCase();
+            if (taskName.includes('review') || taskName.includes('approve')) return 'Manager/Reviewer';
+            if (taskName.includes('system') || taskName.includes('auto')) return 'System/Automation';
+            if (taskName.includes('customer') || taskName.includes('user')) return 'Customer/User';
+            
+            return 'User/Operator';
+        }
+
+        function estimateTaskTime(task) {
+            // Estimate time based on task type and complexity
+            const taskName = task.name.toLowerCase();
+            
+            if (taskName.includes('review') || taskName.includes('approve')) return '10-15 minutes';
+            if (taskName.includes('verify') || taskName.includes('check')) return '5-10 minutes';
+            if (taskName.includes('process') || taskName.includes('complete')) return '15-30 minutes';
+            if (taskName.includes('notify') || taskName.includes('send')) return '2-5 minutes';
+            
+            return '10-20 minutes';
+        }
+
+        function calculateTotalDuration(steps) {
+            // Simple calculation based on number of steps
+            const totalMinutes = steps.length * 12; // Average 12 minutes per step
+            
+            if (totalMinutes < 60) return totalMinutes + 'm';
+            
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            
+            return hours + 'h' + (minutes > 0 ? ' ' + minutes + 'm' : '');
+        }
+
+        function determineComplexity(stepCount, decisionCount) {
+            const complexityScore = stepCount + (decisionCount * 2);
+            
+            if (complexityScore > 25) return 'Very Complex';
+            if (complexityScore > 15) return 'Complex';
+            if (complexityScore > 8) return 'Medium';
+            return 'Simple';
+        }
+
+        function displayDocumentation(documentation) {
+            const previewSection = document.getElementById('previewSection');
+            const contentDiv = document.getElementById('documentationContent');
+            
+            const companyName = document.getElementById('companyName').value || 'Your Organization';
+            const includeOverview = document.getElementById('includeOverview').checked;
+            const includeSteps = document.getElementById('includeSteps').checked;
+            const includeDecisions = document.getElementById('includeDecisions').checked;
+            const includeStats = document.getElementById('includeStats').checked;
+
+            let htmlParts = [];
+
+            // Header
+            htmlParts.push('<div class="doc-section">');
+            htmlParts.push('<h1 style="text-align: center; color: var(--macta-orange); margin-bottom: 30px;">');
+            htmlParts.push(documentation.processOverview.name);
+            htmlParts.push('</h1>');
+            htmlParts.push('<p style="text-align: center; color: #666; margin-bottom: 40px;">');
+            htmlParts.push('Process Documentation - ' + companyName);
+            htmlParts.push('</p>');
+            htmlParts.push('</div>');
+
+            // Process Statistics (moved to top)
+            if (includeStats) {
+                htmlParts.push('<div class="doc-section">');
+                htmlParts.push('<h2>📊 Process Statistics</h2>');
+                htmlParts.push('<div class="stats-grid">');
+                htmlParts.push('<div class="stat-card">');
+                htmlParts.push('<div class="stat-number">' + documentation.processOverview.totalSteps + '</div>');
+                htmlParts.push('<div class="stat-label">Total Steps</div>');
+                htmlParts.push('</div>');
+                htmlParts.push('<div class="stat-card">');
+                htmlParts.push('<div class="stat-number">' + documentation.processOverview.decisionPoints + '</div>');
+                htmlParts.push('<div class="stat-label">Decision Points</div>');
+                htmlParts.push('</div>');
+                htmlParts.push('<div class="stat-card">');
+                htmlParts.push('<div class="stat-number">' + documentation.processOverview.estimatedDuration + '</div>');
+                htmlParts.push('<div class="stat-label">Est. Duration</div>');
+                htmlParts.push('</div>');
+                htmlParts.push('<div class="stat-card">');
+                htmlParts.push('<div class="stat-number">' + documentation.processOverview.complexity + '</div>');
+                htmlParts.push('<div class="stat-label">Complexity</div>');
+                htmlParts.push('</div>');
+                htmlParts.push('</div>');
+                htmlParts.push('</div>');
+            }
+
+            // Process Overview
+            if (includeOverview) {
+                htmlParts.push('<div class="doc-section">');
+                htmlParts.push('<h2>📋 Process Overview</h2>');
+                htmlParts.push('<p><strong>Description:</strong> ' + documentation.processOverview.description + '</p>');
+                htmlParts.push('<p><strong>Total Steps:</strong> ' + documentation.processOverview.totalSteps + '</p>');
+                htmlParts.push('<p><strong>Decision Points:</strong> ' + documentation.processOverview.decisionPoints + '</p>');
+                htmlParts.push('<p><strong>Estimated Duration:</strong> ' + documentation.processOverview.estimatedDuration + '</p>');
+                htmlParts.push('<p><strong>Complexity Level:</strong> ' + documentation.processOverview.complexity + '</p>');
+                htmlParts.push('</div>');
+            }
+
+            // Step-by-Step Procedures
+            if (includeSteps && documentation.procedureSteps.length > 0) {
+                htmlParts.push('<div class="doc-section">');
+                htmlParts.push('<h2>📝 Step-by-Step Procedures</h2>');
+                
+                documentation.procedureSteps.forEach(function(step) {
+                    htmlParts.push('<div class="step-item">');
+                    htmlParts.push('<span class="step-number">' + step.number + '</span>');
+                    htmlParts.push('<strong>' + step.title + '</strong>');
+                    htmlParts.push('<p><strong>Description:</strong> ' + step.description + '</p>');
+                    htmlParts.push('<p><strong>Responsible:</strong> ' + step.responsible + '</p>');
+                    htmlParts.push('<p><strong>Estimated Time:</strong> ' + step.estimatedTime + '</p>');
+                    htmlParts.push('</div>');
+                });
+                
+                htmlParts.push('</div>');
+            }
+
+            // Decision Points (excluding joins)
+            if (includeDecisions && documentation.decisionPoints.length > 0) {
+                htmlParts.push('<div class="doc-section">');
+                htmlParts.push('<h2>🔀 Decision Points</h2>');
+                
+                documentation.decisionPoints.forEach(function(decision) {
+                    htmlParts.push('<div class="decision-item">');
+                    htmlParts.push('<span class="decision-number">?</span>');
+                    htmlParts.push('<strong>' + decision.title + '</strong>');
+                    htmlParts.push('<p><strong>Type:</strong> ' + decision.type.replace(/([A-Z])/g, ' $1').trim() + '</p>');
+                    htmlParts.push('<p><strong>Description:</strong> ' + decision.description + '</p>');
+                    htmlParts.push('<p><strong>Conditions:</strong> ' + decision.conditions.join(', ') + '</p>');
+                    htmlParts.push('<p><strong>Actions:</strong> ' + decision.actions.join(', ') + '</p>');
+                    htmlParts.push('</div>');
+                });
+                
+                htmlParts.push('</div>');
+            }
+
+            contentDiv.innerHTML = htmlParts.join('');
+            previewSection.classList.add('show');
+        }
+
+        function showLoading(show) {
+            const loadingDiv = document.getElementById('loadingDiv');
+            if (show) {
+                loadingDiv.classList.add('show');
+            } else {
+                loadingDiv.classList.remove('show');
+            }
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.innerHTML = '<div class="status-message status-' + type + '">' + message + '</div>';
+            
+            // Auto-hide success messages after 5 seconds
+            if (type === 'success') {
+                setTimeout(function() {
+                    statusDiv.innerHTML = '';
+                }, 5000);
+            }
+        }
+
+        // Export functions
+        function exportToPDF() {
+            if (!currentDocumentation) {
+                showStatus('No documentation to export. Please generate documentation first.', 'error');
+                return;
+            }
+            
+            showStatus('PDF export functionality would be implemented here.', 'info');
+        }
+
+        function exportToWord() {
+            if (!currentDocumentation) {
+                showStatus('No documentation to export. Please generate documentation first.', 'error');
+                return;
+            }
+            
+            showStatus('Word export functionality would be implemented here.', 'info');
+        }
+
+        function exportToHTML() {
+            if (!currentDocumentation) {
+                showStatus('No documentation to export. Please generate documentation first.', 'error');
+                return;
+            }
+            
+            const content = document.getElementById('documentationContent').innerHTML;
+            const blob = new Blob([content], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'process-documentation.html';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showStatus('HTML documentation exported successfully!', 'success');
+        }
+    </script>
+</body>
+</html>
+
