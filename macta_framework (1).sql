@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3306
--- Generation Time: Aug 22, 2025 at 01:59 PM
+-- Generation Time: Sep 06, 2025 at 10:22 PM
 -- Server version: 8.0.30
 -- PHP Version: 8.1.10
 
@@ -166,6 +166,39 @@ CREATE TABLE `process_arrival_configs` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `process_deployments`
+--
+
+CREATE TABLE `process_deployments` (
+  `id` int NOT NULL,
+  `process_model_id` int NOT NULL,
+  `deployment_id` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `flowable_process_key` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `status` enum('deployed','undeployed','failed') COLLATE utf8mb4_general_ci DEFAULT 'deployed',
+  `deployed_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `process_instances`
+--
+
+CREATE TABLE `process_instances` (
+  `id` int NOT NULL,
+  `process_model_id` int NOT NULL,
+  `instance_key` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
+  `flowable_instance_id` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `status` enum('running','completed','suspended','terminated') COLLATE utf8mb4_general_ci DEFAULT 'running',
+  `start_time` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `end_time` timestamp NULL DEFAULT NULL,
+  `variables` json DEFAULT NULL,
+  `created_by` varchar(100) COLLATE utf8mb4_general_ci DEFAULT 'system'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `process_models`
 --
 
@@ -305,6 +338,22 @@ CREATE TABLE `resource_templates` (
   `is_public` tinyint(1) DEFAULT '1',
   `industry` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
   `created_by` int DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `simple_timers`
+--
+
+CREATE TABLE `simple_timers` (
+  `id` int NOT NULL,
+  `process_id` int DEFAULT NULL,
+  `task_name` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `start_time` datetime DEFAULT NULL,
+  `end_time` datetime DEFAULT NULL,
+  `duration` int DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -546,6 +595,20 @@ ALTER TABLE `process_arrival_configs`
   ADD KEY `idx_process` (`process_id`);
 
 --
+-- Indexes for table `process_deployments`
+--
+ALTER TABLE `process_deployments`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `process_model_id` (`process_model_id`);
+
+--
+-- Indexes for table `process_instances`
+--
+ALTER TABLE `process_instances`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `process_model_id` (`process_model_id`);
+
+--
 -- Indexes for table `process_models`
 --
 ALTER TABLE `process_models`
@@ -612,6 +675,12 @@ ALTER TABLE `resource_templates`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_name` (`name`),
   ADD KEY `idx_industry` (`industry`);
+
+--
+-- Indexes for table `simple_timers`
+--
+ALTER TABLE `simple_timers`
+  ADD PRIMARY KEY (`id`);
 
 --
 -- Indexes for table `simulation_configs`
@@ -748,6 +817,18 @@ ALTER TABLE `process_arrival_configs`
   MODIFY `id` int NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `process_deployments`
+--
+ALTER TABLE `process_deployments`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `process_instances`
+--
+ALTER TABLE `process_instances`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `process_models`
 --
 ALTER TABLE `process_models`
@@ -793,6 +874,12 @@ ALTER TABLE `resource_allocations`
 -- AUTO_INCREMENT for table `resource_templates`
 --
 ALTER TABLE `resource_templates`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `simple_timers`
+--
+ALTER TABLE `simple_timers`
   MODIFY `id` int NOT NULL AUTO_INCREMENT;
 
 --
@@ -882,6 +969,18 @@ ALTER TABLE `job_descriptions`
 --
 ALTER TABLE `metrics`
   ADD CONSTRAINT `metrics_ibfk_1` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`);
+
+--
+-- Constraints for table `process_deployments`
+--
+ALTER TABLE `process_deployments`
+  ADD CONSTRAINT `process_deployments_ibfk_1` FOREIGN KEY (`process_model_id`) REFERENCES `process_models` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `process_instances`
+--
+ALTER TABLE `process_instances`
+  ADD CONSTRAINT `process_instances_ibfk_1` FOREIGN KEY (`process_model_id`) REFERENCES `process_models` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `process_models`

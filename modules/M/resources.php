@@ -1,503 +1,577 @@
 <?php
-// modules/M/resources.php - Resource Assignment Sub-page
+// modules/M/resources.php - MACTA Resources Management Page
 header('Content-Type: text/html; charset=utf-8');
 
-// Handle AJAX requests for resource assignment
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    header('Content-Type: application/json');
-    
-    try {
-        switch ($_POST['action']) {
-            case 'assign_resource':
-                // Simulate resource assignment (in real implementation, save to database)
-                echo json_encode(['success' => true, 'message' => 'Resource assigned successfully']);
-                break;
-            default:
-                echo json_encode(['success' => false, 'message' => 'Unknown action']);
+$resources = array();
+$projects = array();
+$project_resources = array();
+$processes = array();
+$db_error = '';
+$selected_project = '';
+
+if (isset($_GET['project_id'])) {
+    $selected_project = $_GET['project_id'];
+}
+
+try {
+    if (file_exists('../../config/config.php')) {
+        require_once '../../config/config.php';
+        
+        $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4";
+        $pdo = new PDO($dsn, DB_USER, DB_PASS, array(
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+        ));
+        
+        // Handle AJAX requests
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+            $action = $_POST['action'];
+            
+            try {
+                if ($action === 'add_resource') {
+                    $stmt = $pdo->prepare("INSERT INTO enhanced_resources (name, type, hourly_cost, skill_level, availability, max_concurrent_tasks, department, location) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                    $stmt->execute(array(
+                        $_POST['name'],
+                        $_POST['type'],
+                        $_POST['hourly_cost'],
+                        $_POST['skill_level'],
+                        isset($_POST['availability']) ? $_POST['availability'] : 100,
+                        1,
+                        isset($_POST['department']) ? $_POST['department'] : '',
+                        isset($_POST['location']) ? $_POST['location'] : ''
+                    ));
+                    echo json_encode(array('success' => true, 'message' => 'Resource added successfully'));
+                    
+                } elseif ($action === 'update_resource') {
+                    $stmt = $pdo->prepare("UPDATE enhanced_resources SET name=?, type=?, hourly_cost=?, skill_level=?, availability=?, department=?, location=? WHERE id=?");
+                    $stmt->execute(array(
+                        $_POST['name'],
+                        $_POST['type'],
+                        $_POST['hourly_cost'],
+                        $_POST['skill_level'],
+                        $_POST['availability'],
+                        $_POST['department'],
+                        $_POST['location'],
+                        $_POST['id']
+                    ));
+                    echo json_encode(array('success' => true, 'message' => 'Resource updated successfully'));
+                    
+                } elseif ($action === 'delete_resource') {
+                    $stmt = $pdo->prepare("DELETE FROM enhanced_resources WHERE id=?");
+                    $stmt->execute(array($_POST['id']));
+                    echo json_encode(array('success' => true, 'message' => 'Resource deleted successfully'));
+                }
+                
+            } catch (Exception $e) {
+                echo json_encode(array('success' => false, 'message' => $e->getMessage()));
+            }
+            exit;
         }
-    } catch (Exception $e) {
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        
+        // Get all global resources
+        $stmt = $pdo->prepare("SELECT * FROM enhanced_resources ORDER BY name");
+        $stmt->execute();
+        $resources = $stmt->fetchAll();
+        
+        // Get all projects
+        $stmt = $pdo->prepare("SELECT * FROM projects WHERE status = 'active' ORDER BY name");
+        $stmt->execute();
+        $projects = $stmt->fetchAll();
+        
+    } else {
+        $db_error = 'Database configuration not found. Please run the installer first.';
     }
-    exit;
+    
+} catch (Exception $e) {
+    $db_error = "Database connection failed: " . $e->getMessage();
+    error_log("MACTA Resources DB Error: " . $e->getMessage());
 }
 ?>
-
-<div class="tab-header">
-    <h2>
-        <span class="tab-icon">👥</span>
-        Advanced Resource Assignment
-    </h2>
-    <p>Assign resources, roles, and responsibilities to process steps with detailed analysis</p>
-</div>
-
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
-    <div class="resource-form">
-        <h3>📋 Task Resource Configuration</h3>
-        
-        <div class="form-group">
-            <label>Select Task:</label>
-            <select id="task-name">
-                <option value="">Select Task...</option>
-            </select>
-        </div>
-        
-        <div class="form-group">
-            <label>Resource Type:</label>
-            <select id="resourceType">
-                <option value="human">👤 Human Resource</option>
-                <option value="machine">🤖 Machine/Equipment</option>
-                <option value="hybrid">⚡ Hybrid (Human + Machine)</option>
-            </select>
-        </div>
-
-        <div class="form-group">
-            <label>Assigned User:</label>
-            <select id="assigned-user">
-                <option value="">Select User...</option>
-                <option value="john.doe">John Doe - Process Analyst</option>
-                <option value="jane.smith">Jane Smith - Operations Manager</option>
-                <option value="mike.wilson">Mike Wilson - Quality Specialist</option>
-                <option value="sarah.connor">Sarah Connor - Team Lead</option>
-                <option value="alex.murphy">Alex Murphy - Senior Consultant</option>
-            </select>
-        </div>
-
-        <div class="form-group">
-            <label>Duration (minutes):</label>
-            <input type="number" id="task-duration" value="30" min="1">
-        </div>
-
-        <div class="form-group">
-            <label>Number of Resources:</label>
-            <input type="number" id="resource-count" value="1" min="1">
-        </div>
-
-        <div class="form-group">
-            <label>Hourly Cost ($):</label>
-            <input type="number" id="hourly-cost" value="50" min="0" step="0.01">
-        </div>
-
-        <div class="form-group">
-            <label>Skill Level:</label>
-            <select id="skill-level">
-                <option value="entry">Entry Level</option>
-                <option value="intermediate">Intermediate</option>
-                <option value="advanced">Advanced</option>
-                <option value="expert">Expert</option>
-            </select>
-        </div>
-
-        <div class="form-group">
-            <label>Priority Level:</label>
-            <select id="priority-level">
-                <option value="">Priority Level...</option>
-                <option value="low">Low Priority</option>
-                <option value="medium">Medium Priority</option>
-                <option value="high">High Priority</option>
-                <option value="critical">Critical</option>
-            </select>
-        </div>
-
-        <div class="form-group">
-            <label>Required Skills:</label>
-            <input type="text" id="task-skills" placeholder="e.g., BPMN, Analysis, Communication">
-        </div>
-
-        <button class="btn btn-success" id="btn-assign-resource">
-            ✅ Assign Resource
-        </button>
-        <button class="btn btn-warning" id="btn-set-default">
-            ⭐ Set as Default
-        </button>
-    </div>
-
-    <div class="resource-form">
-        <h3>📊 Resource Analytics & Templates</h3>
-        
-        <div class="form-group">
-            <label>Resource Template:</label>
-            <select id="resource-template">
-                <option value="">Select Template</option>
-                <option value="analyst">Business Analyst</option>
-                <option value="developer">Software Developer</option>
-                <option value="manager">Project Manager</option>
-                <option value="automation">Automation System</option>
-            </select>
-        </div>
-
-        <div style="background: white; padding: 15px; border-radius: 8px; margin: 15px 0;">
-            <h4>💰 Current Task Calculation:</h4>
-            <div style="margin: 10px 0;">
-                <strong>Total Cost:</strong> $<span id="total-cost">25.00</span>
-            </div>
-            <div style="margin: 10px 0;">
-                <strong>Resource Utilization:</strong> <span id="utilization">100%</span>
-            </div>
-            <div style="margin: 10px 0;">
-                <strong>Estimated Queue Time:</strong> <span id="queue-time">5 min</span>
-            </div>
-        </div>
-
-        <h4>📈 Arrival Rate Configuration</h4>
-        <div class="form-group">
-            <label>Arrival Rate (per hour):</label>
-            <input type="number" id="arrival-rate" value="2" min="0.1" step="0.1">
-        </div>
-
-        <div class="form-group">
-            <label>Process Type:</label>
-            <select id="process-type">
-                <option value="standard">Standard Process</option>
-                <option value="priority">Priority Process</option>
-                <option value="batch">Batch Process</option>
-                <option value="adhoc">Ad-hoc Process</option>
-            </select>
-        </div>
-
-        <div style="background: #e8f5e8; padding: 15px; border-radius: 8px; margin-top: 15px;">
-            <h4>🎯 Optimization Suggestions:</h4>
-            <ul style="margin: 10px 0; padding-left: 20px;">
-                <li>Consider automation for repetitive tasks</li>
-                <li>Implement parallel processing where possible</li>
-                <li>Balance resource allocation across peak hours</li>
-                <li>Use skill-based routing for complex tasks</li>
-            </ul>
-        </div>
-    </div>
-</div>
-
-<!-- Resource Assignment History -->
-<div class="resource-history" style="margin-top: 30px;">
-    <h3>📋 Resource Assignment History</h3>
-    <div class="history-table">
-        <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden;">
-            <thead style="background: var(--htt-blue); color: white;">
-                <tr>
-                    <th style="padding: 12px; text-align: left;">Task</th>
-                    <th style="padding: 12px; text-align: left;">Assigned To</th>
-                    <th style="padding: 12px; text-align: left;">Duration</th>
-                    <th style="padding: 12px; text-align: left;">Cost</th>
-                    <th style="padding: 12px; text-align: left;">Status</th>
-                </tr>
-            </thead>
-            <tbody id="assignment-history">
-                <tr>
-                    <td colspan="5" style="padding: 20px; text-align: center; color: #666;">
-                        No resource assignments yet. Start by assigning resources to tasks above.
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<style>
-/* Resource Assignment Styles */
-.resource-form {
-    background: var(--htt-light-gray);
-    padding: 20px;
-    border-radius: 10px;
-    margin-bottom: 20px;
-    border: 1px solid var(--htt-gray);
-}
-
-.form-group {
-    margin-bottom: 15px;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 5px;
-    font-weight: bold;
-    color: #333;
-}
-
-.form-group input, .form-group select {
-    width: 100%;
-    padding: 12px;
-    border: 2px solid var(--macta-light);
-    border-radius: 8px;
-    font-size: 14px;
-    background: white;
-}
-
-.form-group input:focus, .form-group select:focus {
-    border-color: var(--htt-blue);
-    outline: none;
-    box-shadow: 0 0 0 2px rgba(30,136,229,0.2);
-}
-
-.btn-success {
-    background: var(--macta-green);
-    color: white;
-}
-
-.btn-success:hover {
-    background: #5b4ec7;
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(108,92,231,0.3);
-}
-
-.btn-warning {
-    background: var(--macta-yellow);
-    color: var(--macta-dark);
-}
-
-.btn-warning:hover {
-    background: #f0b95e;
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(253,203,110,0.3);
-}
-
-.resource-history {
-    background: white;
-    padding: 20px;
-    border-radius: 10px;
-    border: 1px solid var(--macta-light);
-}
-
-.history-table table {
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.history-table tbody tr {
-    border-bottom: 1px solid #eee;
-}
-
-.history-table tbody tr:hover {
-    background-color: #f8f9fa;
-}
-
-.history-table td {
-    padding: 12px;
-}
-
-@media (max-width: 768px) {
-    .tab-content > div:first-of-type {
-        grid-template-columns: 1fr;
-    }
-}
-</style>
-
-<script>
-// Resources sub-page specific JavaScript
-let assignmentHistory = [];
-
-// Load process tasks from current XML
-function loadProcessTasks() {
-    // Try to get process XML from sessionStorage or from a global variable
-    const currentXML = sessionStorage.getItem('currentProcessXML');
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MACTA - Resources Management</title>
     
-    if (currentXML) {
-        try {
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(currentXML, 'text/xml');
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: #FF6B35;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h2 {
+            margin: 0;
+            font-size: 24px;
+        }
+        
+        .tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .tab-button {
+            flex: 1;
+            padding: 15px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .tab-button.active {
+            background: white;
+            border-bottom: 3px solid #FF6B35;
+            color: #FF6B35;
+        }
+        
+        .tab-content {
+            display: none;
+            padding: 20px;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .card {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        
+        .card-header {
+            background: #f8f9fa;
+            padding: 15px;
+            border-bottom: 1px solid #ddd;
+            font-weight: bold;
+        }
+        
+        .card-body {
+            padding: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-orange { background: #FF6B35; color: white; }
+        .btn-sm { padding: 4px 8px; font-size: 12px; }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        th {
+            background: #f8f9fa;
+            font-weight: bold;
+        }
+        
+        .badge {
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .badge-human { background: #d4edda; color: #155724; }
+        .badge-machine { background: #fff3cd; color: #856404; }
+        .badge-hybrid { background: #d1ecf1; color: #0c5460; }
+        .badge-software { background: #f8d7da; color: #721c24; }
+        
+        .badge-entry { background: #f8d7da; color: #721c24; }
+        .badge-intermediate { background: #fff3cd; color: #856404; }
+        .badge-advanced { background: #d4edda; color: #155724; }
+        .badge-expert { background: #d1ecf1; color: #0c5460; }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 600px;
+        }
+        
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover {
+            color: black;
+        }
+        
+        .status-message {
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            display: none;
+        }
+        
+        .status-message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status-message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>MACTA - Resources Management</h2>
+            <p>Comprehensive resource management for projects and processes</p>
+        </div>
+
+        <div id="status-message" class="status-message"></div>
+
+        <div class="tabs">
+            <button class="tab-button active" onclick="showTab(event, 'global-resources')">Global Resources</button>
+            <button class="tab-button" onclick="showTab(event, 'project-resources')">Project Resources</button>
+            <button class="tab-button" onclick="showTab(event, 'process-resources')">Process Resources</button>
+            <button class="tab-button" onclick="showTab(event, 'summary')">Summary</button>
+        </div>
+
+        <!-- Global Resources Tab -->
+        <div id="global-resources" class="tab-content active">
+            <div class="card">
+                <div class="card-header">
+                    Global Resource Library
+                    <button class="btn btn-orange" style="float: right;" onclick="openAddModal()">Add New Resource</button>
+                </div>
+                <div class="card-body">
+                    <?php if ($db_error): ?>
+                        <div class="status-message error" style="display: block;">
+                            <strong>Database Error:</strong> <?php echo htmlspecialchars($db_error); ?>
+                        </div>
+                    <?php else: ?>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Hourly Cost</th>
+                                    <th>Skill Level</th>
+                                    <th>Availability</th>
+                                    <th>Department</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($resources as $resource): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars($resource['name']); ?></td>
+                                        <td><span class="badge badge-<?php echo htmlspecialchars($resource['type']); ?>"><?php echo htmlspecialchars($resource['type']); ?></span></td>
+                                        <td>$<?php echo number_format($resource['hourly_cost'], 2); ?></td>
+                                        <td><span class="badge badge-<?php echo htmlspecialchars($resource['skill_level']); ?>"><?php echo htmlspecialchars($resource['skill_level']); ?></span></td>
+                                        <td><?php echo number_format($resource['availability'], 1); ?>%</td>
+                                        <td><?php echo htmlspecialchars($resource['department']); ?></td>
+                                        <td>
+                                            <button class="btn btn-sm btn-primary" onclick="editRes(<?php echo $resource['id']; ?>)">Edit</button>
+                                            <button class="btn btn-sm btn-danger" onclick="deleteRes(<?php echo $resource['id']; ?>)">Delete</button>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+
+        <!-- Project Resources Tab -->
+        <div id="project-resources" class="tab-content">
+            <div class="card">
+                <div class="card-header">Project Resource Assignment</div>
+                <div class="card-body">
+                    <p>Project resource assignment functionality will be implemented here.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Process Resources Tab -->
+        <div id="process-resources" class="tab-content">
+            <div class="card">
+                <div class="card-header">Process Resource Assignment</div>
+                <div class="card-body">
+                    <p>Process resource assignment functionality will be implemented here.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary Tab -->
+        <div id="summary" class="tab-content">
+            <div class="card">
+                <div class="card-header">Resource Summary</div>
+                <div class="card-body">
+                    <p>Total Resources: <?php echo count($resources); ?></p>
+                    <p>Active Projects: <?php echo count($projects); ?></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Resource Modal -->
+    <div id="resource-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h3 id="modal-title">Add New Resource</h3>
             
-            // Extract tasks from BPMN XML
-            const tasks = xmlDoc.getElementsByTagName('*');
-            const taskSelect = document.getElementById('task-name');
-            
-            if (taskSelect) {
-                // Clear existing options except first
-                taskSelect.innerHTML = '<option value="">Select Task...</option>';
+            <form id="resource-form">
+                <input type="hidden" id="resource-id" name="id">
                 
-                for (let task of tasks) {
-                    if (task.tagName.includes('task') || 
-                        task.tagName.includes('startEvent') || 
-                        task.tagName.includes('endEvent')) {
-                        
-                        const name = task.getAttribute('name') || task.getAttribute('id') || 'Unnamed Task';
-                        const taskType = task.tagName.replace('bpmn2:', '').replace('bpmn:', '');
-                        
-                        const option = document.createElement('option');
-                        option.value = task.getAttribute('id') || name;
-                        option.textContent = `${name} (${taskType})`;
-                        taskSelect.appendChild(option);
+                <div class="form-group">
+                    <label>Resource Name:</label>
+                    <input type="text" id="resource-name" name="name" required placeholder="e.g., CSE, CAD Designer">
+                </div>
+                
+                <div class="form-group">
+                    <label>Type:</label>
+                    <select id="resource-type" name="type" required>
+                        <option value="">Select Type</option>
+                        <option value="human">Human</option>
+                        <option value="machine">Machine</option>
+                        <option value="hybrid">Hybrid</option>
+                        <option value="software">Software</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Hourly Cost ($):</label>
+                    <input type="number" id="resource-cost" name="hourly_cost" step="0.01" min="0" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Skill Level:</label>
+                    <select id="resource-skill" name="skill_level" required>
+                        <option value="">Select Skill Level</option>
+                        <option value="entry">Entry</option>
+                        <option value="intermediate">Intermediate</option>
+                        <option value="advanced">Advanced</option>
+                        <option value="expert">Expert</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Availability (%):</label>
+                    <input type="number" id="resource-availability" name="availability" value="100" min="0" max="100" step="0.1">
+                </div>
+                
+                <div class="form-group">
+                    <label>Department:</label>
+                    <input type="text" id="resource-department" name="department" placeholder="e.g., Engineering, Design">
+                </div>
+                
+                <div class="form-group">
+                    <label>Location:</label>
+                    <input type="text" id="resource-location" name="location" placeholder="e.g., Office A, Remote">
+                </div>
+                
+                <div style="text-align: right; margin-top: 20px;">
+                    <button type="button" class="btn" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn btn-orange">Save Resource</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function showTab(evt, tabName) {
+            var i, tabcontent, tablinks;
+            
+            tabcontent = document.getElementsByClassName("tab-content");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].classList.remove("active");
+            }
+            
+            tablinks = document.getElementsByClassName("tab-button");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].classList.remove("active");
+            }
+            
+            document.getElementById(tabName).classList.add("active");
+            evt.currentTarget.classList.add("active");
+        }
+
+        function showMessage(message, type) {
+            var statusEl = document.getElementById('status-message');
+            statusEl.textContent = message;
+            statusEl.className = 'status-message ' + (type || 'success');
+            statusEl.style.display = 'block';
+            
+            setTimeout(function() {
+                statusEl.style.display = 'none';
+            }, 5000);
+        }
+
+        function openAddModal() {
+            document.getElementById('modal-title').textContent = 'Add New Resource';
+            document.getElementById('resource-form').reset();
+            document.getElementById('resource-id').value = '';
+            document.getElementById('resource-modal').style.display = 'block';
+        }
+
+        function editRes(id) {
+            var row = event.target.closest('tr');
+            var cells = row.cells;
+            
+            document.getElementById('modal-title').textContent = 'Edit Resource';
+            document.getElementById('resource-id').value = id;
+            document.getElementById('resource-name').value = cells[0].textContent;
+            document.getElementById('resource-type').value = cells[1].querySelector('.badge').textContent.toLowerCase();
+            document.getElementById('resource-cost').value = cells[2].textContent.replace('$', '');
+            document.getElementById('resource-skill').value = cells[3].querySelector('.badge').textContent.toLowerCase();
+            document.getElementById('resource-availability').value = cells[4].textContent.replace('%', '');
+            document.getElementById('resource-department').value = cells[5].textContent;
+            
+            document.getElementById('resource-modal').style.display = 'block';
+        }
+
+        function deleteRes(id) {
+            if (confirm('Are you sure you want to delete this resource?')) {
+                var formData = new FormData();
+                formData.append('action', 'delete_resource');
+                formData.append('id', id);
+                
+                fetch(window.location.href, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(function(response) {
+                    return response.json();
+                })
+                .then(function(data) {
+                    if (data.success) {
+                        showMessage(data.message);
+                        location.reload();
+                    } else {
+                        showMessage(data.message, 'error');
                     }
-                }
-            }
-            
-        } catch (error) {
-            console.error('Failed to parse BPMN XML:', error);
-        }
-    } else {
-        console.log('No current process XML available');
-    }
-}
-
-function applyResourceSettings() {
-    const duration = parseFloat(document.getElementById('task-duration').value) || 30;
-    const cost = parseFloat(document.getElementById('hourly-cost').value) || 50;
-    const resources = parseInt(document.getElementById('resource-count').value) || 1;
-    const arrivalRate = parseFloat(document.getElementById('arrival-rate').value) || 2;
-    
-    // Calculate total cost
-    const totalCost = (cost * resources * duration / 60).toFixed(2);
-    document.getElementById('total-cost').textContent = totalCost;
-
-    // Calculate utilization
-    const serviceRate = 60 / duration;
-    const utilization = Math.min((arrivalRate / serviceRate * 100), 100).toFixed(0);
-    document.getElementById('utilization').textContent = utilization + '%';
-
-    // Calculate queue time
-    const queueTime = utilization > 80 ? Math.round(duration * 0.3) : Math.round(duration * 0.1);
-    document.getElementById('queue-time').textContent = queueTime + ' min';
-
-    console.log('Resource settings applied:', { duration, cost, resources, totalCost });
-}
-
-function loadResourceTemplate() {
-    const templateName = document.getElementById('resource-template').value;
-    const templates = {
-        'analyst': { duration: 45, cost: 75, resources: 1, skillLevel: 'advanced' },
-        'developer': { duration: 120, cost: 85, resources: 1, skillLevel: 'expert' },
-        'manager': { duration: 30, cost: 100, resources: 1, skillLevel: 'expert' },
-        'automation': { duration: 5, cost: 10, resources: 1, skillLevel: 'expert' }
-    };
-
-    if (templates[templateName]) {
-        const template = templates[templateName];
-        document.getElementById('task-duration').value = template.duration;
-        document.getElementById('hourly-cost').value = template.cost;
-        document.getElementById('resource-count').value = template.resources;
-        document.getElementById('skill-level').value = template.skillLevel;
-        
-        applyResourceSettings();
-        console.log('Template loaded:', templateName);
-    }
-}
-
-function addToAssignmentHistory(assignment) {
-    assignmentHistory.push({
-        ...assignment,
-        id: Date.now(),
-        timestamp: new Date().toLocaleString()
-    });
-    
-    updateHistoryTable();
-}
-
-function updateHistoryTable() {
-    const tbody = document.getElementById('assignment-history');
-    if (!tbody) return;
-    
-    if (assignmentHistory.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="5" style="padding: 20px; text-align: center; color: #666;">
-                    No resource assignments yet. Start by assigning resources to tasks above.
-                </td>
-            </tr>
-        `;
-        return;
-    }
-    
-    tbody.innerHTML = '';
-    
-    assignmentHistory.slice(-10).reverse().forEach(assignment => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${assignment.taskName}</td>
-            <td>${assignment.assignedUser}</td>
-            <td>${assignment.duration} min</td>
-            <td>$${assignment.totalCost}</td>
-            <td><span style="color: var(--macta-green); font-weight: bold;">✅ Assigned</span></td>
-        `;
-        tbody.appendChild(row);
-    });
-}
-
-// Event listeners
-document.addEventListener('tabContentLoaded', function(e) {
-    if (e.detail.tabName === 'resources') {
-        console.log('👥 Resources tab content loaded');
-        
-        // Load process tasks
-        loadProcessTasks();
-        
-        // Attach event listeners
-        attachResourceEventListeners();
-        
-        // Initial calculation
-        applyResourceSettings();
-    }
-});
-
-function attachResourceEventListeners() {
-    // Resource template loading
-    document.getElementById('resource-template')?.addEventListener('change', loadResourceTemplate);
-
-    // Real-time resource calculation
-    ['task-duration', 'hourly-cost', 'resource-count', 'arrival-rate'].forEach(id => {
-        document.getElementById(id)?.addEventListener('input', applyResourceSettings);
-    });
-
-    // Assign resource button
-    document.getElementById('btn-assign-resource')?.addEventListener('click', async () => {
-        const taskName = document.getElementById('task-name').value;
-        const assignedUser = document.getElementById('assigned-user').value;
-        const duration = document.getElementById('task-duration').value;
-        const skills = document.getElementById('task-skills').value;
-        const totalCost = document.getElementById('total-cost').textContent;
-        
-        if (!taskName || !assignedUser) {
-            alert('Please fill in task name and assigned user! 📋');
-            return;
-        }
-        
-        try {
-            const formData = new FormData();
-            formData.append('action', 'assign_resource');
-            formData.append('task_name', taskName);
-            formData.append('assigned_user', assignedUser);
-            formData.append('duration', duration);
-            formData.append('skills', skills);
-            
-            const response = await fetch('resources.php', {
-                method: 'POST',
-                body: formData
-            });
-            
-            const result = await response.json();
-            
-            if (result.success) {
-                alert(`✅ MACTA Resource assigned successfully!\n\nTask: ${taskName}\nAssigned to: ${assignedUser}\nDuration: ${duration} minutes\nSkills: ${skills}`);
-                
-                // Add to history
-                addToAssignmentHistory({
-                    taskName: document.getElementById('task-name').options[document.getElementById('task-name').selectedIndex].text,
-                    assignedUser: document.getElementById('assigned-user').options[document.getElementById('assigned-user').selectedIndex].text,
-                    duration: duration,
-                    totalCost: totalCost
+                })
+                .catch(function(error) {
+                    showMessage('Error: ' + error.message, 'error');
                 });
-                
-                // Clear form
-                document.getElementById('task-name').value = '';
-                document.getElementById('assigned-user').value = '';
-                document.getElementById('task-skills').value = '';
-            } else {
-                alert('Failed to assign resource: ' + result.message);
             }
-            
-        } catch (error) {
-            console.error('Assignment error:', error);
-            alert('Failed to assign resource ❌');
         }
-    });
 
-    document.getElementById('btn-set-default')?.addEventListener('click', function() {
-        const template = {
-            duration: document.getElementById('task-duration').value,
-            cost: document.getElementById('hourly-cost').value,
-            resources: document.getElementById('resource-count').value,
-            skillLevel: document.getElementById('skill-level').value,
-            resourceType: document.getElementById('resourceType').value
+        function closeModal() {
+            document.getElementById('resource-modal').style.display = 'none';
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('resource-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                var formData = new FormData(this);
+                var isEdit = formData.get('id');
+                formData.append('action', isEdit ? 'update_resource' : 'add_resource');
+                
+                fetch(window.location.href, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(function(response) {
+                    return response.json();
+                })
+                .then(function(data) {
+                    if (data.success) {
+                        showMessage(data.message);
+                        closeModal();
+                        location.reload();
+                    } else {
+                        showMessage(data.message, 'error');
+                    }
+                })
+                .catch(function(error) {
+                    showMessage('Error: ' + error.message, 'error');
+                });
+            });
+        });
+
+        window.onclick = function(event) {
+            var modal = document.getElementById('resource-modal');
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
         };
-        
-        localStorage.setItem('mactaDefaultResourceTemplate', JSON.stringify(template));
-        alert('⭐ MACTA settings saved as default template!');
-    });
-}
-
-console.log('👥 Resources sub-page script loaded');
+    </script>
+</body>
+</html>
