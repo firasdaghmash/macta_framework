@@ -74,6 +74,27 @@ function parseTasksFromXML($xml_content) {
     return $tasks;
 }
 
+// Function to get revision badge class based on revision reference
+function getRevisionBadgeClass($revisionRef) {
+    if (empty($revisionRef)) {
+        return 'badge-default';
+    }
+    
+    $revisionRef = strtoupper($revisionRef);
+    
+    if (strpos($revisionRef, 'REV-001') !== false) {
+        return 'badge-rev-001';
+    } elseif (strpos($revisionRef, 'REV-002') !== false) {
+        return 'badge-rev-002';
+    } elseif (strpos($revisionRef, 'REV-003') !== false) {
+        return 'badge-rev-003';
+    } elseif (strpos($revisionRef, 'SIM') !== false) {
+        return 'badge-sim';
+    } else {
+        return 'badge-default';
+    }
+}
+
 // Handle AJAX requests first before any HTML output
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action'])) {
     header('Content-Type: application/json');
@@ -181,6 +202,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action'])) {
                 exit;
             }
             
+            if ($_GET['action'] === 'get_assignment') {
+                $type = isset($_GET['type']) ? $_GET['type'] : '';
+                $id = isset($_GET['id']) ? $_GET['id'] : '';
+                
+                if ($type === 'project' && $id) {
+                    try {
+                        $stmt = $pdo->prepare("
+                            SELECT pr.*, p.name as project_name, r.name as resource_name
+                            FROM project_resources pr
+                            LEFT JOIN projects p ON pr.project_id = p.id
+                            LEFT JOIN enhanced_resources r ON pr.resource_id = r.id
+                            WHERE pr.id = ?
+                        ");
+                        $stmt->execute(array($id));
+                        $assignment = $stmt->fetch();
+                        
+                        if ($assignment) {
+                            echo json_encode(array('success' => true, 'assignment' => $assignment));
+                        } else {
+                            echo json_encode(array('success' => false, 'message' => 'Assignment not found'));
+                        }
+                    } catch (Exception $e) {
+                        echo json_encode(array('success' => false, 'message' => $e->getMessage()));
+                    }
+                } elseif ($type === 'process' && $id) {
+                    try {
+                        $stmt = $pdo->prepare("
+                            SELECT pr.*, pm.name as process_name, r.name as resource_name
+                            FROM process_resources pr
+                            LEFT JOIN process_models pm ON pr.process_id = pm.id
+                            LEFT JOIN enhanced_resources r ON pr.resource_id = r.id
+                            WHERE pr.id = ?
+                        ");
+                        $stmt->execute(array($id));
+                        $assignment = $stmt->fetch();
+                        
+                        if ($assignment) {
+                            echo json_encode(array('success' => true, 'assignment' => $assignment));
+                        } else {
+                            echo json_encode(array('success' => false, 'message' => 'Assignment not found'));
+                        }
+                    } catch (Exception $e) {
+                        echo json_encode(array('success' => false, 'message' => $e->getMessage()));
+                    }
+                } else {
+                    echo json_encode(array('success' => false, 'message' => 'Invalid parameters'));
+                }
+                exit;
+            }
+            
         } else {
             echo json_encode(array('error' => 'Database configuration not found'));
             exit;
@@ -188,6 +259,74 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action'])) {
         
     } catch (Exception $e) {
         echo json_encode(array('error' => $e->getMessage()));
+        exit;
+    }
+}
+
+// Handle POST requests for updates
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    header('Content-Type: application/json');
+    
+    try {
+        if (file_exists('../../config/config.php')) {
+            require_once '../../config/config.php';
+            
+            $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4";
+            $pdo = new PDO($dsn, DB_USER, DB_PASS, array(
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+            ));
+            
+            if ($_POST['action'] === 'update_project_assignment') {
+                $assignmentId = $_POST['assignment_id'];
+                $projectId = $_POST['project_id'];
+                $resourceId = $_POST['resource_id'];
+                $quantity = $_POST['quantity_required'];
+                $notes = $_POST['notes'] ?? '';
+                
+                $stmt = $pdo->prepare("
+                    UPDATE project_resources 
+                    SET project_id = ?, resource_id = ?, quantity_required = ?, notes = ?, updated_by = 'system', updated_at = NOW()
+                    WHERE id = ?
+                ");
+                $stmt->execute(array($projectId, $resourceId, $quantity, $notes, $assignmentId));
+                
+                echo json_encode(array('success' => true, 'message' => 'Project assignment updated successfully'));
+                exit;
+            }
+            
+            if ($_POST['action'] === 'update_process_assignment') {
+                $assignmentId = $_POST['assignment_id'];
+                $processId = $_POST['process_id'];
+                $taskId = $_POST['task_id'];
+                $resourceId = $_POST['resource_id'];
+                $quantity = $_POST['quantity_required'];
+                $duration = $_POST['duration_minutes'];
+                $complexity = $_POST['complexity_level'];
+                $priority = $_POST['priority_level'];
+                $revisionRef = $_POST['revision_ref'] ?? 'REV-001';
+                $revisionNotes = $_POST['revision_notes'] ?? '';
+                
+                $stmt = $pdo->prepare("
+                    UPDATE process_resources 
+                    SET process_id = ?, task_id = ?, resource_id = ?, quantity_required = ?, 
+                        duration_minutes = ?, complexity_level = ?, priority_level = ?, 
+                        revision_ref = ?, revision_notes = ?, updated_by = 'system', updated_at = NOW()
+                    WHERE id = ?
+                ");
+                $stmt->execute(array($processId, $taskId, $resourceId, $quantity, $duration, $complexity, $priority, $revisionRef, $revisionNotes, $assignmentId));
+                
+                echo json_encode(array('success' => true, 'message' => 'Process assignment updated successfully'));
+                exit;
+            }
+            
+        } else {
+            echo json_encode(array('success' => false, 'message' => 'Database configuration not found'));
+            exit;
+        }
+        
+    } catch (Exception $e) {
+        echo json_encode(array('success' => false, 'message' => $e->getMessage()));
         exit;
     }
 }
@@ -262,6 +401,19 @@ try {
             FOREIGN KEY (resource_id) REFERENCES enhanced_resources(id) ON DELETE CASCADE
         )");
         
+        // Add missing columns for revision tracking if they don't exist
+        try {
+            $pdo->exec("ALTER TABLE process_resources ADD COLUMN revision_ref VARCHAR(50) DEFAULT 'REV-001'");
+        } catch (PDOException $e) {
+            // Column already exists, ignore error
+        }
+        
+        try {
+            $pdo->exec("ALTER TABLE process_resources ADD COLUMN revision_notes TEXT");
+        } catch (PDOException $e) {
+            // Column already exists, ignore error
+        }
+        
         
         // Handle POST requests
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
@@ -307,7 +459,7 @@ try {
                     echo json_encode(array('success' => true, 'message' => 'Resource assigned to project successfully'));
                     
                 } elseif ($action === 'assign_to_process') {
-                    $stmt = $pdo->prepare("INSERT INTO process_resources (process_id, task_id, resource_id, quantity_required, duration_minutes, complexity_level, priority_level) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                    $stmt = $pdo->prepare("INSERT INTO process_resources (process_id, task_id, resource_id, quantity_required, duration_minutes, complexity_level, priority_level, revision_ref, revision_notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
                     $stmt->execute(array(
                         $_POST['process_id'], 
                         $_POST['task_id'], 
@@ -315,7 +467,9 @@ try {
                         $_POST['quantity_required'],
                         $_POST['duration_minutes'],
                         $_POST['complexity_level'],
-                        $_POST['priority_level']
+                        $_POST['priority_level'],
+                        $_POST['revision_ref'] ?? 'REV-001',
+                        $_POST['revision_notes'] ?? ''
                     ));
                     echo json_encode(array('success' => true, 'message' => 'Resource assigned to process successfully'));
                     
@@ -330,6 +484,178 @@ try {
                     }
                     $stmt->execute(array($assignment_id));
                     echo json_encode(array('success' => true, 'message' => 'Assignment removed successfully'));
+                    
+                } elseif ($action === 'mass_delete_assignments') {
+                    $assignment_ids = json_decode($_POST['assignment_ids'], true);
+                    
+                    if (!is_array($assignment_ids) || empty($assignment_ids)) {
+                        echo json_encode(array('success' => false, 'message' => 'No assignment IDs provided'));
+                        exit;
+                    }
+                    
+                    // Validate assignment IDs are numeric
+                    foreach ($assignment_ids as $id) {
+                        if (!is_numeric($id)) {
+                            echo json_encode(array('success' => false, 'message' => 'Invalid assignment ID format'));
+                            exit;
+                        }
+                    }
+                    
+                    // Create placeholders for IN clause
+                    $placeholders = str_repeat('?,', count($assignment_ids) - 1) . '?';
+                    
+                    // Delete from process_resources table
+                    $stmt = $pdo->prepare("DELETE FROM process_resources WHERE id IN ($placeholders)");
+                    $stmt->execute($assignment_ids);
+                    
+                    $deleted_count = $stmt->rowCount();
+                    
+                    echo json_encode(array(
+                        'success' => true, 
+                        'message' => "Successfully deleted $deleted_count assignment(s)",
+                        'deleted_count' => $deleted_count
+                    ));
+                }
+                
+            } catch (Exception $e) {
+                echo json_encode(array('success' => false, 'message' => $e->getMessage()));
+            }
+            exit;
+        }
+        
+        // Handle get_summary_data AJAX request
+        if (isset($_GET['action']) && $_GET['action'] === 'get_summary_data') {
+            $project_id = isset($_GET['project_id']) ? $_GET['project_id'] : null;
+            
+            try {
+                $summary_data = array();
+                
+                if ($project_id) {
+                    // Project-specific summary
+                    $stmt = $pdo->prepare("SELECT name FROM projects WHERE id = ?");
+                    $stmt->execute(array($project_id));
+                    $project = $stmt->fetch();
+                    $summary_data['project_name'] = $project ? $project['name'] : 'Unknown Project';
+                    
+                    // Project resource assignments
+                    $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM project_resources WHERE project_id = ? AND status = 'active'");
+                    $stmt->execute(array($project_id));
+                    $summary_data['project_assignments'] = $stmt->fetch()['count'];
+                    
+                    // Process assignments for this project
+                    $stmt = $pdo->prepare("
+                        SELECT COUNT(*) as count 
+                        FROM process_resources pr 
+                        JOIN process_models pm ON pr.process_id = pm.id 
+                        WHERE pm.project_id = ? AND pr.status = 'active'
+                    ");
+                    $stmt->execute(array($project_id));
+                    $summary_data['process_assignments'] = $stmt->fetch()['count'];
+                    
+                    // Total cost for project resources
+                    $stmt = $pdo->prepare("
+                        SELECT SUM(er.hourly_cost * pr.quantity_required) as total_cost
+                        FROM project_resources pr
+                        JOIN enhanced_resources er ON pr.resource_id = er.id
+                        WHERE pr.project_id = ? AND pr.status = 'active'
+                    ");
+                    $stmt->execute(array($project_id));
+                    $summary_data['project_cost'] = $stmt->fetch()['total_cost'] ?: 0;
+                    
+                    // Process cost for this project
+                    $stmt = $pdo->prepare("
+                        SELECT SUM(er.hourly_cost * pr.quantity_required * (pr.duration_minutes/60)) as total_cost
+                        FROM process_resources pr
+                        JOIN enhanced_resources er ON pr.resource_id = er.id
+                        JOIN process_models pm ON pr.process_id = pm.id
+                        WHERE pm.project_id = ? AND pr.status = 'active'
+                    ");
+                    $stmt->execute(array($project_id));
+                    $summary_data['process_cost'] = $stmt->fetch()['total_cost'] ?: 0;
+                    
+                } else {
+                    // Overall system summary (existing data)
+                    $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM enhanced_resources");
+                    $stmt->execute();
+                    $summary_data['total_resources'] = $stmt->fetch()['count'];
+                    
+                    $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM projects WHERE status = 'active'");
+                    $stmt->execute();
+                    $summary_data['active_projects'] = $stmt->fetch()['count'];
+                    
+                    $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM process_models");
+                    $stmt->execute();
+                    $summary_data['available_processes'] = $stmt->fetch()['count'];
+                    
+                    $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM project_resources WHERE status = 'active'");
+                    $stmt->execute();
+                    $summary_data['project_assignments'] = $stmt->fetch()['count'];
+                    
+                    $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM process_resources WHERE status = 'active'");
+                    $stmt->execute();
+                    $summary_data['process_assignments'] = $stmt->fetch()['count'];
+                    
+                    $stmt = $pdo->prepare("SELECT SUM(hourly_cost) as total_cost FROM enhanced_resources");
+                    $stmt->execute();
+                    $summary_data['total_hourly_cost'] = $stmt->fetch()['total_cost'] ?: 0;
+                }
+                
+                echo json_encode(array('success' => true, 'data' => $summary_data));
+                
+            } catch (Exception $e) {
+                echo json_encode(array('success' => false, 'message' => $e->getMessage()));
+            }
+            exit;
+        }
+        
+        // Handle get_process_xml AJAX request
+        if (isset($_GET['action']) && $_GET['action'] === 'get_process_xml') {
+            $process_id = isset($_GET['process_id']) ? $_GET['process_id'] : null;
+            
+            try {
+                if ($process_id) {
+                    $stmt = $pdo->prepare("SELECT model_data, name FROM process_models WHERE id = ?");
+                    $stmt->execute(array($process_id));
+                    $process = $stmt->fetch();
+                    
+                    if ($process && !empty($process['model_data'])) {
+                        echo json_encode(array(
+                            'success' => true, 
+                            'xml' => $process['model_data'],
+                            'name' => $process['name']
+                        ));
+                    } else {
+                        echo json_encode(array('success' => false, 'message' => 'Process XML not found'));
+                    }
+                } else {
+                    echo json_encode(array('success' => false, 'message' => 'Process ID required'));
+                }
+                
+            } catch (Exception $e) {
+                echo json_encode(array('success' => false, 'message' => $e->getMessage()));
+            }
+            exit;
+        }
+        
+        // Handle get_process_assignments AJAX request
+        if (isset($_GET['action']) && $_GET['action'] === 'get_process_assignments') {
+            $process_id = isset($_GET['process_id']) ? $_GET['process_id'] : null;
+            
+            try {
+                if ($process_id) {
+                    $stmt = $pdo->prepare("
+                        SELECT pr.*, er.name as resource_name
+                        FROM process_resources pr
+                        JOIN enhanced_resources er ON pr.resource_id = er.id
+                        WHERE pr.process_id = ? AND pr.status = 'active'
+                        ORDER BY pr.task_id, pr.id DESC
+                    ");
+                    $stmt->execute(array($process_id));
+                    $assignments = $stmt->fetchAll();
+                    
+                    echo json_encode(array('success' => true, 'assignments' => $assignments));
+                } else {
+                    echo json_encode(array('success' => false, 'message' => 'Process ID required'));
                 }
                 
             } catch (Exception $e) {
@@ -391,15 +717,42 @@ try {
         // Get process resources if process is selected
         if ($selected_process) {
             $stmt = $pdo->prepare("
-                SELECT pr.*, er.name as resource_name, er.type, er.hourly_cost, er.skill_level, pm.name as process_name
+                SELECT pr.id, pr.process_id, pr.task_id, pr.resource_id, pr.quantity_required, 
+                       pr.duration_minutes, pr.complexity_level, pr.priority_level, pr.assigned_date, 
+                       pr.status, pr.revision_ref, pr.revision_notes,
+                       er.name as resource_name, er.type, er.hourly_cost, er.skill_level, 
+                       pm.name as process_name, pm.model_data
                 FROM process_resources pr 
                 JOIN enhanced_resources er ON pr.resource_id = er.id 
                 JOIN process_models pm ON pr.process_id = pm.id
                 WHERE pr.process_id = ? AND pr.status = 'active'
-                ORDER BY pr.task_id, er.name
+                ORDER BY pr.task_id, pr.id DESC
             ");
             $stmt->execute(array($selected_process));
             $process_resources = $stmt->fetchAll();
+            
+            // Debug: Log the retrieved data
+            error_log("DEBUG: Retrieved " . count($process_resources) . " process resources");
+            foreach ($process_resources as $index => $pr) {
+                error_log("DEBUG: Assignment $index - ID: " . $pr['id'] . ", Task: " . $pr['task_id'] . ", Rev: " . ($pr['revision_ref'] ?? 'NULL'));
+            }
+            
+            // Extract task names from BPMN XML for each resource assignment
+            foreach ($process_resources as &$pr) {
+                $pr['task_name'] = extractTaskNameFromBPMN($pr['model_data'], $pr['task_id']);
+            }
+        }
+        
+        // Get all unique Rev/Ref# values for dynamic filtering
+        $revision_refs = array();
+        if ($pdo) {
+            try {
+                $stmt = $pdo->prepare("SELECT DISTINCT revision_ref FROM process_resources WHERE revision_ref IS NOT NULL AND revision_ref != '' ORDER BY revision_ref");
+                $stmt->execute();
+                $revision_refs = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            } catch (Exception $e) {
+                error_log("Error fetching revision refs: " . $e->getMessage());
+            }
         }
         
     } else {
@@ -409,6 +762,87 @@ try {
 } catch (Exception $e) {
     $db_error = "Database connection failed: " . $e->getMessage();
     error_log("MACTA Resources DB Error: " . $e->getMessage());
+}
+
+// Function to extract task name from BPMN XML
+function extractTaskNameFromBPMN($xmlData, $taskId) {
+    if (empty($xmlData) || empty($taskId)) {
+        return $taskId; // Return task ID if no XML data
+    }
+    
+    try {
+        // Clean XML data
+        $xmlData = trim($xmlData);
+        if (strpos($xmlData, '<?xml') !== 0) {
+            $xmlData = '<?xml version="1.0" encoding="UTF-8"?>' . $xmlData;
+        }
+        
+        // Parse XML
+        $xml = simplexml_load_string($xmlData);
+        if ($xml === false) {
+            return $taskId;
+        }
+        
+        // Register namespaces for BPMN
+        $namespaces = $xml->getNamespaces(true);
+        if (isset($namespaces[''])) {
+            $xml->registerXPathNamespace('bpmn', $namespaces['']);
+        }
+        if (isset($namespaces['bpmn2'])) {
+            $xml->registerXPathNamespace('bpmn', $namespaces['bpmn2']);
+        }
+        
+        // Search for the task with matching ID
+        $xpaths = [
+            "//bpmn:userTask[@id='$taskId']",
+            "//bpmn:serviceTask[@id='$taskId']",
+            "//bpmn:scriptTask[@id='$taskId']",
+            "//bpmn:manualTask[@id='$taskId']",
+            "//bpmn:task[@id='$taskId']",
+            "//*[@id='$taskId']" // Fallback for any element with the ID
+        ];
+        
+        foreach ($xpaths as $xpath) {
+            $elements = $xml->xpath($xpath);
+            if (!empty($elements)) {
+                $element = $elements[0];
+                
+                // Try to get name attribute
+                $name = (string)$element['name'];
+                if (!empty($name)) {
+                    return $name;
+                }
+                
+                // Try to get text content
+                $text = trim((string)$element);
+                if (!empty($text)) {
+                    return $text;
+                }
+            }
+        }
+        
+        // If no name found, try without namespaces
+        $dom = new DOMDocument();
+        $dom->loadXML($xmlData);
+        $xpath = new DOMXPath($dom);
+        
+        $elements = $xpath->query("//*[@id='$taskId']");
+        if ($elements->length > 0) {
+            $element = $elements->item(0);
+            $name = $element->getAttribute('name');
+            if (!empty($name)) {
+                return $name;
+            }
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error parsing BPMN XML for task $taskId: " . $e->getMessage());
+    }
+    
+    // Return a more user-friendly version of the task ID
+    $friendlyName = str_replace(['Activity_', 'Task_', '_'], ['', '', ' '], $taskId);
+    $friendlyName = ucwords(trim($friendlyName));
+    return !empty($friendlyName) ? $friendlyName : $taskId;
 }
 ?>
 <!DOCTYPE html>
@@ -572,6 +1006,88 @@ try {
         .badge-medium { background: #fff3cd; color: #856404; }
         .badge-high { background: #f8d7da; color: #721c24; }
         .badge-critical { background: #dc3545; color: white; }
+        .badge-info { background: #d1ecf1; color: #0c5460; }
+        
+        /* Revision-specific badge colors to match diagram */
+        .badge-rev-001 { background: #e3f2fd; color: #1976d2; border: 1px solid #1976d2; }
+        .badge-rev-002 { background: #f3e5f5; color: #7b1fa2; border: 1px solid #7b1fa2; }
+        .badge-rev-003 { background: #e8f5e8; color: #388e3c; border: 1px solid #388e3c; }
+        .badge-sim { background: #fff3e0; color: #f57c00; border: 1px solid #f57c00; }
+        .badge-default { background: #f5f5f5; color: #666; border: 1px solid #999; }
+        
+        /* Enhanced Table Styles */
+        .enhanced-table {
+            position: relative;
+        }
+        
+        .table-controls {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .search-box {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            min-width: 200px;
+        }
+        
+        .filter-select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            background: white;
+        }
+        
+        .table-info {
+            color: #666;
+            font-size: 12px;
+            margin-left: auto;
+        }
+        
+        .sortable-header {
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            padding-right: 20px !important;
+        }
+        
+        .sortable-header:hover {
+            background: #e9ecef !important;
+        }
+        
+        .sort-indicator {
+            position: absolute;
+            right: 5px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .sort-asc::after {
+            content: '▲';
+        }
+        
+        .sort-desc::after {
+            content: '▼';
+        }
+        
+        .table-row-hidden {
+            display: none !important;
+        }
+        
+        .no-results {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-style: italic;
+        }
         
         .modal {
             display: none;
@@ -586,11 +1102,28 @@ try {
         
         .modal-content {
             background-color: white;
-            margin: 5% auto;
+            margin: 2% auto;
             padding: 20px;
             border-radius: 8px;
-            width: 80%;
-            max-width: 600px;
+            width: 90%;
+            max-width: 700px;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+            cursor: move;
+        }
+        
+        .modal-header {
+            cursor: move;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+            margin-bottom: 15px;
+            user-select: none;
+        }
+        
+        .modal-header h3 {
+            margin: 0;
+            display: inline-block;
         }
         
         .close {
@@ -665,7 +1198,71 @@ try {
             margin: 0;
             color: #666;
         }
+        
+        /* BPMN Viewer Styles */
+        .process-viewer {
+            height: 500px;
+            border: 2px solid var(--macta-light);
+            border-radius: 10px;
+            background: #fafafa;
+            margin-bottom: 20px;
+            position: relative;
+            overflow: auto;
+        }
+        
+        .process-viewer .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            font-size: 16px;
+            color: #666;
+            background: #f9f9f9;
+        }
+        
+        .bpmn-viewer-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        
+        /* Task highlighting for assignments */
+        .djs-element.assigned-task .djs-visual > :first-child {
+            stroke: #28a745 !important;
+            stroke-width: 3px !important;
+        }
+        
+        .djs-element.assigned-task-rev1 .djs-visual > :first-child {
+            stroke: #007bff !important;
+            stroke-width: 3px !important;
+            fill: rgba(0, 123, 255, 0.1) !important;
+        }
+        
+        .djs-element.assigned-task-rev2 .djs-visual > :first-child {
+            stroke: #dc3545 !important;
+            stroke-width: 3px !important;
+            fill: rgba(220, 53, 69, 0.1) !important;
+        }
+        
+        .djs-element.assigned-task-sim .djs-visual > :first-child {
+            stroke: #ffc107 !important;
+            stroke-width: 3px !important;
+            fill: rgba(255, 193, 7, 0.1) !important;
+        }
+        
+        .djs-element.clickable-task {
+            cursor: pointer;
+        }
+        
+        .djs-element.clickable-task:hover .djs-visual > :first-child {
+            stroke: #ff6b35 !important;
+            stroke-width: 2px !important;
+        }
     </style>
+    
+    <!-- Include BPMN.js for process visualization -->
+    <link rel="stylesheet" href="https://unpkg.com/bpmn-js@17.0.0/dist/assets/diagram-js.css" />
+    <link rel="stylesheet" href="https://unpkg.com/bpmn-js@17.0.0/dist/assets/bpmn-font/css/bpmn-embedded.css" />
 </head>
 <body>
     <div class="container">
@@ -696,35 +1293,60 @@ try {
                             <strong>Database Error:</strong> <?php echo htmlspecialchars($db_error); ?>
                         </div>
                     <?php else: ?>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Type</th>
-                                    <th>Hourly Cost</th>
-                                    <th>Skill Level</th>
-                                    <th>Availability</th>
-                                    <th>Department</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($resources as $resource): ?>
+                        <div class="enhanced-table">
+                            <div class="table-controls">
+                                <input type="text" class="search-box" placeholder="Search resources..." onkeyup="filterTable('global-resources-table', this.value)">
+                                <select class="filter-select" onchange="filterTableByColumn('global-resources-table', 2, this.value)">
+                                    <option value="">All Types</option>
+                                    <option value="human">Human</option>
+                                    <option value="machine">Machine</option>
+                                    <option value="hybrid">Hybrid</option>
+                                    <option value="software">Software</option>
+                                </select>
+                                <select class="filter-select" onchange="filterTableByColumn('global-resources-table', 4, this.value)">
+                                    <option value="">All Skill Levels</option>
+                                    <option value="entry">Entry</option>
+                                    <option value="intermediate">Intermediate</option>
+                                    <option value="advanced">Advanced</option>
+                                    <option value="expert">Expert</option>
+                                </select>
+                                <div class="table-info">
+                                    <span id="global-resources-count"><?php echo count($resources); ?></span> resources
+                                </div>
+                            </div>
+                            <table id="global-resources-table">
+                                <thead>
                                     <tr>
-                                        <td><?php echo htmlspecialchars($resource['name']); ?></td>
-                                        <td><span class="badge badge-<?php echo htmlspecialchars($resource['type']); ?>"><?php echo htmlspecialchars($resource['type']); ?></span></td>
-                                        <td>$<?php echo number_format($resource['hourly_cost'], 2); ?></td>
-                                        <td><span class="badge badge-<?php echo htmlspecialchars($resource['skill_level']); ?>"><?php echo htmlspecialchars($resource['skill_level']); ?></span></td>
-                                        <td><?php echo number_format($resource['availability'], 1); ?>%</td>
-                                        <td><?php echo htmlspecialchars($resource['department']); ?></td>
-                                        <td>
-                                            <button class="btn btn-sm btn-primary" onclick="editRes(<?php echo $resource['id']; ?>)">Edit</button>
-                                            <button class="btn btn-sm btn-danger" onclick="deleteRes(<?php echo $resource['id']; ?>)">Delete</button>
-                                        </td>
+                                        <th class="sortable-header" onclick="sortTable('global-resources-table', 0)">Name <span class="sort-indicator"></span></th>
+                                        <th class="sortable-header" onclick="sortTable('global-resources-table', 1)">Description <span class="sort-indicator"></span></th>
+                                        <th class="sortable-header" onclick="sortTable('global-resources-table', 2)">Type <span class="sort-indicator"></span></th>
+                                        <th class="sortable-header" onclick="sortTable('global-resources-table', 3)">Cost/Hour <span class="sort-indicator"></span></th>
+                                        <th class="sortable-header" onclick="sortTable('global-resources-table', 4)">Skill Level <span class="sort-indicator"></span></th>
+                                        <th class="sortable-header" onclick="sortTable('global-resources-table', 5)">Availability <span class="sort-indicator"></span></th>
+                                        <th>Actions</th>
                                     </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($resources as $resource): ?>
+                                        <tr>
+                                            <td><?php echo htmlspecialchars($resource['name']); ?></td>
+                                            <td><?php echo htmlspecialchars($resource['description'] ?? ''); ?></td>
+                                            <td><span class="badge badge-<?php echo htmlspecialchars($resource['type']); ?>"><?php echo htmlspecialchars($resource['type']); ?></span></td>
+                                            <td>$<?php echo number_format($resource['hourly_cost'], 2); ?></td>
+                                            <td><span class="badge badge-<?php echo htmlspecialchars($resource['skill_level']); ?>"><?php echo htmlspecialchars($resource['skill_level']); ?></span></td>
+                                            <td><?php echo number_format($resource['availability'], 1); ?>%</td>
+                                            <td>
+                                                <button class="btn btn-sm btn-primary" onclick="editRes(<?php echo $resource['id']; ?>)">Edit</button>
+                                                <button class="btn btn-sm btn-danger" onclick="deleteRes(<?php echo $resource['id']; ?>)">Delete</button>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                            <div id="global-resources-no-results" class="no-results" style="display: none;">
+                                No resources match your search criteria.
+                            </div>
+                        </div>
                     <?php endif; ?>
                 </div>
             </div>
@@ -796,18 +1418,32 @@ try {
                         <?php if (empty($project_resources)): ?>
                             <p>No resources assigned to this project yet.</p>
                         <?php else: ?>
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Resource Name</th>
-                                        <th>Type</th>
-                                        <th>Skill Level</th>
-                                        <th>Hourly Cost</th>
-                                        <th>Quantity Required</th>
-                                        <th>Assigned Date</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
+                            <div class="enhanced-table">
+                                <div class="table-controls">
+                                    <input type="text" class="search-box" placeholder="Search project resources..." onkeyup="filterTable('project-resources-table', this.value)">
+                                    <select class="filter-select" onchange="filterTableByColumn('project-resources-table', 1, this.value)">
+                                        <option value="">All Types</option>
+                                        <option value="human">Human</option>
+                                        <option value="machine">Machine</option>
+                                        <option value="hybrid">Hybrid</option>
+                                        <option value="software">Software</option>
+                                    </select>
+                                    <div class="table-info">
+                                        <span id="project-resources-count"><?php echo count($project_resources); ?></span> assignments
+                                    </div>
+                                </div>
+                                <table id="project-resources-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="sortable-header" onclick="sortTable('project-resources-table', 0)">Resource Name <span class="sort-indicator"></span></th>
+                                            <th class="sortable-header" onclick="sortTable('project-resources-table', 1)">Type <span class="sort-indicator"></span></th>
+                                            <th class="sortable-header" onclick="sortTable('project-resources-table', 2)">Skill Level <span class="sort-indicator"></span></th>
+                                            <th class="sortable-header" onclick="sortTable('project-resources-table', 3)">Hourly Cost <span class="sort-indicator"></span></th>
+                                            <th class="sortable-header" onclick="sortTable('project-resources-table', 4)">Quantity Required <span class="sort-indicator"></span></th>
+                                            <th class="sortable-header" onclick="sortTable('project-resources-table', 5)">Assigned Date <span class="sort-indicator"></span></th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
                                 <tbody>
                                     <?php foreach ($project_resources as $pr): ?>
                                         <tr>
@@ -818,12 +1454,17 @@ try {
                                             <td><?php echo number_format($pr['quantity_required'], 1); ?></td>
                                             <td><?php echo date('Y-m-d', strtotime($pr['assigned_date'])); ?></td>
                                             <td>
+                                                <button class="btn btn-sm btn-primary" onclick="editProjectAssignment(<?php echo $pr['id']; ?>)">Edit</button>
                                                 <button class="btn btn-sm btn-danger" onclick="removeAssignment(<?php echo $pr['id']; ?>, 'project')">Remove</button>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
+                            <div id="project-resources-no-results" class="no-results" style="display: none;">
+                                No project resources match your search criteria.
+                            </div>
+                        </div>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -864,6 +1505,39 @@ try {
                     </div>
                 </div>
             </div>
+            
+            <!-- Rev/Ref# Legend -->
+            <?php if ($selected_process): ?>
+                <div class="card">
+                    <div class="card-header">
+                        <strong>Assignment Legend</strong>
+                        <small style="float: right; color: #666;">Click legend items to highlight specific assignments</small>
+                    </div>
+                    <div class="card-body" style="padding: 15px;">
+                        <div id="rev-ref-legend" style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center;">
+                            <div class="legend-item" onclick="highlightRevRef('')" style="cursor: pointer; padding: 8px 12px; border: 2px solid #28a745; background: rgba(40, 167, 69, 0.1); border-radius: 5px; font-size: 12px; font-weight: bold;">
+                                <span style="color: #28a745;">■</span> All Assignments
+                            </div>
+                            <div id="legend-loading" style="color: #666; font-style: italic;">Loading assignment data...</div>
+                        </div>
+                    </div>
+                </div>
+            <?php endif; ?>
+            
+            <!-- BPMN Process Viewer -->
+            <?php if ($selected_process): ?>
+                <div class="card">
+                    <div class="card-header">
+                        <strong>Process Visualization - <?php echo htmlspecialchars($processes_for_selected_project[array_search($selected_process, array_column($processes_for_selected_project, 'id'))]['name'] ?? 'Selected Process'); ?></strong>
+                        <small style="float: right; color: #666;">Click on tasks to assign resources</small>
+                    </div>
+                    <div class="card-body" style="padding: 0;">
+                        <div id="process-bpmn-viewer" class="process-viewer">
+                            <div class="loading">Loading process visualization...</div>
+                        </div>
+                    </div>
+                </div>
+            <?php endif; ?>
             
             <?php if ($selected_process): ?>
                 <!-- Process Summary Section -->
@@ -923,36 +1597,65 @@ try {
                         <?php if (empty($process_resources)): ?>
                             <p>No resources assigned to this process yet.</p>
                         <?php else: ?>
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Task ID</th>
-                                        <th>Resource Name</th>
-                                        <th>Type</th>
-                                        <th>Quantity</th>
-                                        <th>Duration</th>
-                                        <th>Complexity</th>
-                                        <th>Priority</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($process_resources as $pr): ?>
+                            <div class="enhanced-table">
+                                <div class="table-controls">
+                                    <input type="text" class="search-box" placeholder="Search process resources..." onkeyup="filterTable('process-resources-table', this.value)">
+                                    <select class="filter-select" onchange="filterTableByColumn('process-resources-table', 2, this.value)">
+                                        <option value="">All Types</option>
+                                        <option value="human">Human</option>
+                                        <option value="machine">Machine</option>
+                                        <option value="hybrid">Hybrid</option>
+                                        <option value="software">Software</option>
+                                    </select>
+                                    <select class="filter-select" onchange="filterTableByColumn('process-resources-table', 7, this.value)">
+                                        <option value="">All Revisions</option>
+                                        <?php foreach ($revision_refs as $ref): ?>
+                                            <option value="<?php echo htmlspecialchars($ref); ?>"><?php echo htmlspecialchars($ref); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <button class="btn btn-sm btn-secondary" onclick="refreshProcessResources()" title="Refresh data from database">
+                                        🔄 Refresh
+                                    </button>
+                                    <button class="btn btn-sm btn-info" onclick="retrieveAssignments()" title="Retrieve latest assignments from database">
+                                        📥 Retrieve Assignments
+                                    </button>
+                                    <button id="mass-delete-btn" class="btn btn-sm btn-danger" onclick="massDeleteAssignments()" style="display: none;" title="Delete selected assignments">
+                                        🗑️ Delete Selected (<span id="selected-count">0</span>)
+                                    </button>
+                                    <div class="table-info">
+                                        <span id="process-resources-count"><?php echo count($process_resources); ?></span> assignments
+                                    </div>
+                                </div>
+                                <table id="process-resources-table">
+                                    <thead>
                                         <tr>
-                                            <td><?php echo htmlspecialchars($pr['task_id']); ?></td>
-                                            <td><?php echo htmlspecialchars($pr['resource_name']); ?></td>
-                                            <td><span class="badge badge-<?php echo htmlspecialchars($pr['type']); ?>"><?php echo htmlspecialchars($pr['type']); ?></span></td>
-                                            <td><?php echo number_format($pr['quantity_required'], 1); ?></td>
-                                            <td><?php echo $pr['duration_minutes']; ?> min</td>
-                                            <td><span class="badge badge-<?php echo htmlspecialchars($pr['complexity_level']); ?>"><?php echo htmlspecialchars($pr['complexity_level']); ?></span></td>
-                                            <td><span class="badge badge-<?php echo htmlspecialchars($pr['priority_level']); ?>"><?php echo htmlspecialchars($pr['priority_level']); ?></span></td>
-                                            <td>
-                                                <button class="btn btn-sm btn-danger" onclick="removeAssignment(<?php echo $pr['id']; ?>, 'process')">Remove</button>
-                                            </td>
+                                            <th style="width: 40px;">
+                                                <input type="checkbox" id="select-all-assignments" onchange="toggleSelectAll()" title="Select all assignments">
+                                            </th>
+                                            <th class="sortable-header" onclick="sortTable('process-resources-table', 1)">Task <span class="sort-indicator"></span></th>
+                                            <th class="sortable-header" onclick="sortTable('process-resources-table', 2)">Resource Name <span class="sort-indicator"></span></th>
+                                            <th class="sortable-header" onclick="sortTable('process-resources-table', 3)">Type <span class="sort-indicator"></span></th>
+                                            <th class="sortable-header" onclick="sortTable('process-resources-table', 4)">Quantity <span class="sort-indicator"></span></th>
+                                            <th class="sortable-header" onclick="sortTable('process-resources-table', 5)">Duration <span class="sort-indicator"></span></th>
+                                            <th class="sortable-header" onclick="sortTable('process-resources-table', 6)">Complexity <span class="sort-indicator"></span></th>
+                                            <th class="sortable-header" onclick="sortTable('process-resources-table', 7)">Priority <span class="sort-indicator"></span></th>
+                                            <th class="sortable-header" onclick="sortTable('process-resources-table', 8)">Rev/Ref# <span class="sort-indicator"></span></th>
+                                            <th>Actions</th>
                                         </tr>
-                                    <?php endforeach; ?>
+                                    </thead>
+                                <tbody id="process-resources-tbody">
+                                    <!-- Table data will be loaded dynamically via AJAX to match diagram data -->
+                                    <tr>
+                                        <td colspan="8" style="text-align: center; padding: 20px; color: #666;">
+                                            Loading assignments...
+                                        </td>
+                                    </tr>
                                 </tbody>
                             </table>
+                            <div id="process-resources-no-results" class="no-results" style="display: none;">
+                                No process resources match your search criteria.
+                            </div>
+                        </div>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -967,19 +1670,30 @@ try {
 
         <!-- Summary Tab -->
         <div id="summary" class="tab-content <?php echo ($active_tab === 'summary') ? 'active' : ''; ?>">
-            <div class="summary-grid">
-                <div class="summary-card">
-                    <h3><?php echo count($resources); ?></h3>
-                    <p>Total Resources</p>
-                </div>
-                <div class="summary-card">
-                    <h3><?php echo count($projects); ?></h3>
-                    <p>Active Projects</p>
-                </div>
-                <div class="summary-card">
-                    <h3><?php echo count($processes); ?></h3>
-                    <p>Available Processes</p>
-                </div>
+            <div class="selector-group">
+                <label for="summary-project-selector">Summary Scope:</label>
+                <select id="summary-project-selector" onchange="updateSummaryData()">
+                    <option value="">Overall System Summary</option>
+                    <?php foreach ($projects as $project): ?>
+                        <option value="<?php echo $project['id']; ?>"><?php echo htmlspecialchars($project['name']); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            
+            <div id="summary-content">
+                <div class="summary-grid">
+                    <div class="summary-card">
+                        <h3><?php echo count($resources); ?></h3>
+                        <p>Total Resources</p>
+                    </div>
+                    <div class="summary-card">
+                        <h3><?php echo count($projects); ?></h3>
+                        <p>Active Projects</p>
+                    </div>
+                    <div class="summary-card">
+                        <h3><?php echo count($processes); ?></h3>
+                        <p>Available Processes</p>
+                    </div>
                 <?php
                 // Calculate total project assignments
                 $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM project_resources WHERE status = 'active'");
@@ -1040,8 +1754,8 @@ try {
                     </table>
                 </div>
             </div>
+            </div>
         </div>
-    </div>
 
     <!-- Add/Edit Resource Modal -->
     <div id="resource-modal" class="modal">
@@ -1147,11 +1861,60 @@ try {
         </div>
     </div>
 
+    <!-- Edit Project Assignment Modal -->
+    <div id="edit-project-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('edit-project-modal')">&times;</span>
+            <h3>Edit Project Assignment</h3>
+            
+            <input type="hidden" id="edit-project-assignment-id">
+            
+            <div class="form-group">
+                <label>Project:</label>
+                <select id="edit-modal-project" required>
+                    <option value="">Choose a project...</option>
+                    <?php foreach ($projects as $project): ?>
+                        <option value="<?php echo $project['id']; ?>">
+                            <?php echo htmlspecialchars($project['name']); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Resource:</label>
+                <select id="edit-modal-resource" required>
+                    <option value="">Choose a resource...</option>
+                    <?php foreach ($resources as $resource): ?>
+                        <option value="<?php echo $resource['id']; ?>"><?php echo htmlspecialchars($resource['name']); ?> (<?php echo ucfirst($resource['type']); ?>)</option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Quantity Required:</label>
+                <input type="number" id="edit-modal-quantity" value="1" step="0.1" min="0.1" required>
+            </div>
+            
+            <div class="form-group">
+                <label>Notes (optional):</label>
+                <textarea id="edit-modal-notes" placeholder="Additional notes about this assignment..." rows="2"></textarea>
+            </div>
+            
+            <div style="text-align: right; margin-top: 20px;">
+                <button class="btn" onclick="closeModal('edit-project-modal')">Cancel</button>
+                <button class="btn btn-orange" onclick="updateProjectAssignment()">Update Assignment</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Process Assignment Modal -->
     <div id="process-modal" class="modal">
         <div class="modal-content">
-            <span class="close" onclick="closeModal('process-modal')">&times;</span>
-            <h3>Assign Resource to Process</h3>
+            <div class="modal-header">
+                <h3>Assign Resource to Process</h3>
+                <span class="close" onclick="closeModal('process-modal')">&times;</span>
+            </div>
             
             <div class="form-group">
                 <label>Select Process:</label>
@@ -1170,6 +1933,12 @@ try {
                 <select id="modal-task" required>
                     <option value="">Choose a task...</option>
                 </select>
+            </div>
+            
+            <div class="form-group" style="display: none;">
+                <label>Task Name:</label>
+                <input type="text" id="modal-task-name" readonly style="background-color: #f8f9fa; color: #666;">
+                <small style="color: #666; font-size: 12px;">Auto-filled when task is selected</small>
             </div>
             
             <div class="form-group">
@@ -1212,9 +1981,105 @@ try {
                 </select>
             </div>
             
+            <div class="form-group">
+                <label>Revision/Reference #:</label>
+                <input type="text" id="modal-revision-ref" value="REV-001" placeholder="e.g., REV-001, SIM-2024-01" required>
+                <small style="color: #666; font-size: 12px;">Use this to group assignments for simulation comparisons</small>
+            </div>
+            
+            <div class="form-group">
+                <label>Notes (optional):</label>
+                <textarea id="modal-revision-notes" placeholder="Additional notes about this assignment or revision..." rows="2"></textarea>
+            </div>
+            
             <div style="text-align: right; margin-top: 20px;">
                 <button class="btn" onclick="closeModal('process-modal')">Cancel</button>
                 <button class="btn btn-orange" onclick="assignToProcess()">Assign Resource</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Process Assignment Modal -->
+    <div id="edit-process-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('edit-process-modal')">&times;</span>
+            <h3>Edit Process Assignment</h3>
+            
+            <input type="hidden" id="edit-process-assignment-id">
+            
+            <div class="form-group">
+                <label>Process:</label>
+                <select id="edit-modal-process" onchange="loadTasksForEditProcess()" required>
+                    <option value="">Choose a process...</option>
+                    <?php foreach ($processes_for_selected_project as $process): ?>
+                        <option value="<?php echo $process['id']; ?>">
+                            <?php echo htmlspecialchars($process['name']); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Task:</label>
+                <select id="edit-modal-task" required>
+                    <option value="">Choose a task...</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Resource:</label>
+                <select id="edit-modal-process-resource" required>
+                    <option value="">Choose a resource...</option>
+                    <?php foreach ($resources as $resource): ?>
+                        <option value="<?php echo $resource['id']; ?>"><?php echo htmlspecialchars($resource['name']); ?> (<?php echo ucfirst($resource['type']); ?>)</option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Quantity Required:</label>
+                <input type="number" id="edit-modal-process-quantity" value="1" step="0.1" min="0.1" required>
+            </div>
+            
+            <div class="form-group">
+                <label>Duration (minutes):</label>
+                <input type="number" id="edit-modal-duration" value="60" min="1" required>
+                <small style="color: #666; font-size: 12px;">Auto-populated from task averages when task is selected. You can edit this value.</small>
+            </div>
+            
+            <div class="form-group">
+                <label>Complexity Level:</label>
+                <select id="edit-modal-complexity" required>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Priority Level:</label>
+                <select id="edit-modal-priority" required>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Revision/Reference #:</label>
+                <input type="text" id="edit-modal-revision-ref" value="REV-001" placeholder="e.g., REV-001, SIM-2024-01" required>
+                <small style="color: #666; font-size: 12px;">Use this to group assignments for simulation comparisons</small>
+            </div>
+            
+            <div class="form-group">
+                <label>Notes (optional):</label>
+                <textarea id="edit-modal-revision-notes" placeholder="Additional notes about this assignment or revision..." rows="2"></textarea>
+            </div>
+            
+            <div style="text-align: right; margin-top: 20px;">
+                <button class="btn" onclick="closeModal('edit-process-modal')">Cancel</button>
+                <button class="btn btn-orange" onclick="updateProcessAssignment()">Update Assignment</button>
             </div>
         </div>
     </div>
@@ -1292,6 +2157,9 @@ try {
         }
 
         function openProcessModal() {
+            // Clear all modal fields first
+            clearProcessModalFields();
+            
             // Set the selected process in the modal and load tasks
             var processSelector = document.getElementById('process-selector');
             var modalProcess = document.getElementById('modal-process');
@@ -1304,19 +2172,66 @@ try {
             
             openModal('process-modal');
         }
+        
+        function clearProcessModalFields() {
+            // Clear all form fields with null checks
+            const modalTask = document.getElementById('modal-task');
+            const modalTaskName = document.getElementById('modal-task-name');
+            const modalProcessResource = document.getElementById('modal-process-resource');
+            const modalProcessQuantity = document.getElementById('modal-process-quantity');
+            const modalDuration = document.getElementById('modal-duration');
+            const modalComplexity = document.getElementById('modal-complexity');
+            const modalPriority = document.getElementById('modal-priority');
+            const modalRevRef = document.getElementById('modal-rev-ref');
+            
+            if (modalTask) modalTask.innerHTML = '<option value="">Choose a task...</option>';
+            if (modalTaskName) modalTaskName.value = '';
+            if (modalProcessResource) modalProcessResource.value = '';
+            if (modalProcessQuantity) modalProcessQuantity.value = '1';
+            if (modalDuration) modalDuration.value = '60';
+            if (modalComplexity) modalComplexity.value = '';
+            if (modalPriority) modalPriority.value = '';
+            if (modalRevRef) modalRevRef.value = 'REV-001';
+        }
 
         function editRes(id) {
             var row = event.target.closest('tr');
-            var cells = row.getElementsByTagName('td');
+            if (!row) {
+                console.error('Could not find table row');
+                return;
+            }
             
-            document.getElementById('modal-title').textContent = 'Edit Resource';
-            document.getElementById('resource-id').value = id;
-            document.getElementById('resource-name').value = cells[0].textContent;
-            document.getElementById('resource-type').value = cells[1].querySelector('.badge').textContent.toLowerCase();
-            document.getElementById('resource-cost').value = cells[2].textContent.replace('$', '').replace(',', '');
-            document.getElementById('resource-skill').value = cells[3].querySelector('.badge').textContent.toLowerCase();
-            document.getElementById('resource-availability').value = cells[4].textContent.replace('%', '');
-            document.getElementById('resource-department').value = cells[5].textContent;
+            var cells = row.getElementsByTagName('td');
+            if (cells.length === 0) {
+                console.error('Could not find table cells');
+                return;
+            }
+            
+            // Get elements with null checks
+            const modalTitle = document.getElementById('modal-title');
+            const resourceId = document.getElementById('resource-id');
+            const resourceName = document.getElementById('resource-name');
+            const resourceType = document.getElementById('resource-type');
+            const resourceCost = document.getElementById('resource-cost');
+            const resourceSkill = document.getElementById('resource-skill');
+            const resourceAvailability = document.getElementById('resource-availability');
+            const resourceDepartment = document.getElementById('resource-department');
+            
+            // Set values with null checks
+            if (modalTitle) modalTitle.textContent = 'Edit Resource';
+            if (resourceId) resourceId.value = id;
+            if (resourceName && cells[0]) resourceName.value = cells[0].textContent;
+            if (resourceType && cells[1]) {
+                const badge = cells[1].querySelector('.badge');
+                if (badge) resourceType.value = badge.textContent.toLowerCase();
+            }
+            if (resourceCost && cells[2]) resourceCost.value = cells[2].textContent.replace('$', '').replace(',', '');
+            if (resourceSkill && cells[3]) {
+                const badge = cells[3].querySelector('.badge');
+                if (badge) resourceSkill.value = badge.textContent.toLowerCase();
+            }
+            if (resourceAvailability && cells[4]) resourceAvailability.value = cells[4].textContent.replace('%', '');
+            if (resourceDepartment && cells[5]) resourceDepartment.value = cells[5].textContent;
             
             openModal('resource-modal');
         }
@@ -1387,9 +2302,14 @@ try {
             window.location.href = buildURL({process_project_id: projectId, process_id: processId});
         }
 
-        function loadTasksForProcess() {
-            var processId = document.getElementById('modal-process').value;
+        function loadTasksForProcess(processId, callback) {
+            // If no processId provided, get it from modal
+            if (!processId) {
+                processId = document.getElementById('modal-process').value;
+            }
+            
             var taskSelector = document.getElementById('modal-task');
+            var taskNameField = document.getElementById('modal-task-name');
             
             if (processId) {
                 fetch(window.location.pathname + '?action=get_tasks&process_id=' + processId)
@@ -1401,6 +2321,7 @@ try {
                     tasks.forEach(function(task) {
                         var option = document.createElement('option');
                         option.value = task.task_id;
+                        // Show task name if available, otherwise show task ID
                         option.textContent = task.task_name || task.task_id;
                         taskSelector.appendChild(option);
                     });
@@ -1410,19 +2331,33 @@ try {
                     var newTaskSelector = taskSelector.cloneNode(true);
                     taskSelector.parentNode.replaceChild(newTaskSelector, taskSelector);
                     
-                    // Add event listener for task selection to auto-populate duration
+                    // Add event listener for task selection to auto-populate duration and task name
                     newTaskSelector.addEventListener('change', function() {
                         if (this.value) {
+                            // Update task name field
+                            var selectedOption = this.options[this.selectedIndex];
+                            if (taskNameField && selectedOption) {
+                                taskNameField.value = selectedOption.textContent;
+                            }
+                            
                             loadTaskDuration(processId, this.value);
                         } else {
                             // Reset to default if no task selected
                             document.getElementById('modal-duration').value = 60;
+                            if (taskNameField) {
+                                taskNameField.value = '';
+                            }
                         }
                     });
                     
                     // If a task is already selected, load its duration
                     if (newTaskSelector.value) {
                         loadTaskDuration(processId, newTaskSelector.value);
+                    }
+                    
+                    // Execute callback if provided
+                    if (callback && typeof callback === 'function') {
+                        callback();
                     }
                 })
                 .catch(function(error) {
@@ -1433,6 +2368,9 @@ try {
                 taskSelector.disabled = true;
                 // Reset duration to default
                 document.getElementById('modal-duration').value = 60;
+                if (taskNameField) {
+                    taskNameField.value = '';
+                }
             }
         }
 
@@ -1515,15 +2453,63 @@ try {
         }
 
         function assignToProcess() {
-            var processId = document.getElementById('modal-process').value;
-            var taskId = document.getElementById('modal-task').value;
-            var resourceId = document.getElementById('modal-process-resource').value;
-            var quantity = document.getElementById('modal-process-quantity').value;
-            var duration = document.getElementById('modal-duration').value;
-            var complexity = document.getElementById('modal-complexity').value;
-            var priority = document.getElementById('modal-priority').value;
+            console.log('assignToProcess() called');
+            
+            // Get elements with null checks
+            const processElement = document.getElementById('modal-process');
+            const taskElement = document.getElementById('modal-task');
+            const resourceElement = document.getElementById('modal-process-resource');
+            const quantityElement = document.getElementById('modal-process-quantity');
+            const durationElement = document.getElementById('modal-duration');
+            const complexityElement = document.getElementById('modal-complexity');
+            const priorityElement = document.getElementById('modal-priority');
+            const revisionRefElement = document.getElementById('modal-revision-ref');
+            const revisionNotesElement = document.getElementById('modal-revision-notes');
+            
+            // Check if elements exist before reading values
+            if (!processElement || !taskElement || !resourceElement || !quantityElement || !durationElement) {
+                console.error('Required form elements not found');
+                console.error('Elements found:', {
+                    processElement: !!processElement,
+                    taskElement: !!taskElement,
+                    resourceElement: !!resourceElement,
+                    quantityElement: !!quantityElement,
+                    durationElement: !!durationElement
+                });
+                showMessage('Form elements not found. Please try again.', 'error');
+                return;
+            }
+            
+            // Debug: Check if revision elements are found
+            console.log('Revision elements check:', {
+                revisionRefElement: !!revisionRefElement,
+                revisionNotesElement: !!revisionNotesElement,
+                revisionRefValue: revisionRefElement ? revisionRefElement.value : 'ELEMENT_NOT_FOUND',
+                revisionNotesValue: revisionNotesElement ? revisionNotesElement.value : 'ELEMENT_NOT_FOUND'
+            });
+            
+            var processId = processElement.value;
+            var taskId = taskElement.value;
+            var resourceId = resourceElement.value;
+            var quantity = quantityElement.value;
+            var duration = durationElement.value;
+            var complexity = complexityElement ? complexityElement.value : '';
+            var priority = priorityElement ? priorityElement.value : '';
+            var revisionRef = revisionRefElement ? revisionRefElement.value : 'REV-001';
+            var revisionNotes = revisionNotesElement ? revisionNotesElement.value : '';
+            
+            console.log('Assignment data:', {
+                processId, taskId, resourceId, quantity, duration, complexity, priority, revisionRef, revisionNotes
+            });
             
             if (!processId || !taskId || !resourceId || !quantity || !duration) {
+                console.error('Required fields missing:', {
+                    processId: !!processId,
+                    taskId: !!taskId,
+                    resourceId: !!resourceId,
+                    quantity: !!quantity,
+                    duration: !!duration
+                });
                 showMessage('Please fill in all required fields', 'error');
                 return;
             }
@@ -1537,24 +2523,44 @@ try {
             formData.append('duration_minutes', duration);
             formData.append('complexity_level', complexity);
             formData.append('priority_level', priority);
+            formData.append('revision_ref', revisionRef);
+            formData.append('revision_notes', revisionNotes);
+            
+            console.log('Sending AJAX request with FormData:', {
+                action: 'assign_to_process',
+                process_id: processId,
+                task_id: taskId,
+                resource_id: resourceId,
+                quantity_required: quantity,
+                duration_minutes: duration,
+                complexity_level: complexity,
+                priority_level: priority,
+                revision_ref: revisionRef,
+                revision_notes: revisionNotes
+            });
             
             fetch(window.location.href, {
                 method: 'POST',
                 body: formData
             })
             .then(function(response) {
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
                 if (!response.ok) {
-                    throw new Error('Network response was not ok');
+                    throw new Error('Network response was not ok: ' + response.status);
                 }
                 return response.text();
             })
             .then(function(text) {
+                console.log('Raw response text:', text);
                 try {
                     var data = JSON.parse(text);
+                    console.log('Parsed response data:', data);
                     if (data.success) {
-                        showMessage(data.message);
+                        showMessage(data.message, 'success');
                         closeModal('process-modal');
                         var projectId = document.getElementById('process-project-selector').value;
+                        console.log('Redirecting to:', buildURL({process_project_id: projectId, process_id: processId}));
                         window.location.href = buildURL({process_project_id: projectId, process_id: processId});
                     } else {
                         showMessage(data.message, 'error');
@@ -1610,6 +2616,235 @@ try {
             }
         }
 
+        // Edit functionality for project assignments
+        function editProjectAssignment(assignmentId) {
+            // Fetch assignment data and populate edit modal
+            fetch(window.location.pathname + '?action=get_assignment&type=project&id=' + assignmentId)
+            .then(function(response) {
+                return response.json();
+            })
+            .then(function(data) {
+                if (data.success) {
+                    var assignment = data.assignment;
+                    document.getElementById('edit-project-assignment-id').value = assignment.id;
+                    document.getElementById('edit-modal-project').value = assignment.project_id;
+                    document.getElementById('edit-modal-resource').value = assignment.resource_id;
+                    document.getElementById('edit-modal-quantity').value = assignment.quantity_required;
+                    document.getElementById('edit-modal-notes').value = assignment.notes || '';
+                    openModal('edit-project-modal');
+                } else {
+                    showMessage('Error loading assignment data: ' + data.message, 'error');
+                }
+            })
+            .catch(function(error) {
+                showMessage('Error loading assignment: ' + error.message, 'error');
+            });
+        }
+
+        function updateProjectAssignment() {
+            var assignmentId = document.getElementById('edit-project-assignment-id').value;
+            var projectId = document.getElementById('edit-modal-project').value;
+            var resourceId = document.getElementById('edit-modal-resource').value;
+            var quantity = document.getElementById('edit-modal-quantity').value;
+            var notes = document.getElementById('edit-modal-notes').value;
+            
+            if (!projectId || !resourceId || !quantity) {
+                showMessage('Please fill in all required fields', 'error');
+                return;
+            }
+            
+            var formData = new FormData();
+            formData.append('action', 'update_project_assignment');
+            formData.append('assignment_id', assignmentId);
+            formData.append('project_id', projectId);
+            formData.append('resource_id', resourceId);
+            formData.append('quantity_required', quantity);
+            formData.append('notes', notes);
+            
+            fetch(window.location.href, {
+                method: 'POST',
+                body: formData
+            })
+            .then(function(response) {
+                return response.text();
+            })
+            .then(function(text) {
+                try {
+                    var data = JSON.parse(text);
+                    if (data.success) {
+                        showMessage(data.message);
+                        closeModal('edit-project-modal');
+                        window.location.href = buildURL({project_id: projectId});
+                    } else {
+                        showMessage(data.message, 'error');
+                    }
+                } catch (e) {
+                    console.error('JSON parse error:', e);
+                    showMessage('Server response error. Check console for details.', 'error');
+                }
+            })
+            .catch(function(error) {
+                showMessage('Network error: ' + error.message, 'error');
+            });
+        }
+
+        // Edit functionality for process assignments
+        function editProcessAssignment(assignmentId) {
+            // Fetch assignment data and populate edit modal
+            fetch(window.location.pathname + '?action=get_assignment&type=process&id=' + assignmentId)
+            .then(function(response) {
+                return response.json();
+            })
+            .then(function(data) {
+                if (data.success) {
+                    var assignment = data.assignment;
+                    document.getElementById('edit-process-assignment-id').value = assignment.id;
+                    document.getElementById('edit-modal-process').value = assignment.process_id;
+                    document.getElementById('edit-modal-process-resource').value = assignment.resource_id;
+                    document.getElementById('edit-modal-process-quantity').value = assignment.quantity_required;
+                    document.getElementById('edit-modal-duration').value = assignment.duration_minutes;
+                    document.getElementById('edit-modal-complexity').value = assignment.complexity_level;
+                    document.getElementById('edit-modal-priority').value = assignment.priority_level;
+                    document.getElementById('edit-modal-revision-ref').value = assignment.revision_ref || 'REV-001';
+                    document.getElementById('edit-modal-revision-notes').value = assignment.revision_notes || '';
+                    
+                    // Load tasks for the process and then select the task
+                    loadTasksForEditProcess().then(function() {
+                        document.getElementById('edit-modal-task').value = assignment.task_id;
+                    });
+                    
+                    openModal('edit-process-modal');
+                } else {
+                    showMessage('Error loading assignment data: ' + data.message, 'error');
+                }
+            })
+            .catch(function(error) {
+                showMessage('Error loading assignment: ' + error.message, 'error');
+            });
+        }
+
+        function loadTasksForEditProcess() {
+            return new Promise(function(resolve, reject) {
+                var processId = document.getElementById('edit-modal-process').value;
+                var taskSelector = document.getElementById('edit-modal-task');
+                
+                if (processId) {
+                    fetch(window.location.pathname + '?action=get_tasks&process_id=' + processId)
+                    .then(function(response) {
+                        return response.json();
+                    })
+                    .then(function(tasks) {
+                        taskSelector.innerHTML = '<option value="">Choose a task...</option>';
+                        tasks.forEach(function(task) {
+                            var option = document.createElement('option');
+                            option.value = task.task_id;
+                            option.textContent = task.task_name || task.task_id;
+                            taskSelector.appendChild(option);
+                        });
+                        taskSelector.disabled = false;
+                        
+                        // Add event listener for task selection to auto-populate duration
+                        taskSelector.addEventListener('change', function() {
+                            if (this.value) {
+                                loadTaskDurationForEdit(processId, this.value);
+                            }
+                        });
+                        
+                        resolve();
+                    })
+                    .catch(function(error) {
+                        reject(error);
+                    });
+                } else {
+                    taskSelector.innerHTML = '<option value="">Choose a task...</option>';
+                    taskSelector.disabled = true;
+                    resolve();
+                }
+            });
+        }
+
+        function loadTaskDurationForEdit(processId, taskId) {
+            if (!processId || !taskId) return;
+            
+            fetch(window.location.pathname + '?action=get_timer_averages&process_id=' + processId)
+            .then(function(response) {
+                return response.json();
+            })
+            .then(function(result) {
+                if (result.success && result.averages) {
+                    var taskAverage = result.averages.find(function(avg) {
+                        return avg.task_id === taskId;
+                    });
+                    
+                    if (taskAverage) {
+                        var minutes = Math.floor(taskAverage.average_duration / 60);
+                        document.getElementById('edit-modal-duration').value = minutes;
+                    }
+                }
+            })
+            .catch(function(error) {
+                console.error('Error loading task duration:', error);
+            });
+        }
+
+        function updateProcessAssignment() {
+            var assignmentId = document.getElementById('edit-process-assignment-id').value;
+            var processId = document.getElementById('edit-modal-process').value;
+            var taskId = document.getElementById('edit-modal-task').value;
+            var resourceId = document.getElementById('edit-modal-process-resource').value;
+            var quantity = document.getElementById('edit-modal-process-quantity').value;
+            var duration = document.getElementById('edit-modal-duration').value;
+            var complexity = document.getElementById('edit-modal-complexity').value;
+            var priority = document.getElementById('edit-modal-priority').value;
+            var revisionRef = document.getElementById('edit-modal-revision-ref').value;
+            var revisionNotes = document.getElementById('edit-modal-revision-notes').value;
+            
+            if (!processId || !taskId || !resourceId || !quantity || !duration) {
+                showMessage('Please fill in all required fields', 'error');
+                return;
+            }
+            
+            var formData = new FormData();
+            formData.append('action', 'update_process_assignment');
+            formData.append('assignment_id', assignmentId);
+            formData.append('process_id', processId);
+            formData.append('task_id', taskId);
+            formData.append('resource_id', resourceId);
+            formData.append('quantity_required', quantity);
+            formData.append('duration_minutes', duration);
+            formData.append('complexity_level', complexity);
+            formData.append('priority_level', priority);
+            formData.append('revision_ref', revisionRef);
+            formData.append('revision_notes', revisionNotes);
+            
+            fetch(window.location.href, {
+                method: 'POST',
+                body: formData
+            })
+            .then(function(response) {
+                return response.text();
+            })
+            .then(function(text) {
+                try {
+                    var data = JSON.parse(text);
+                    if (data.success) {
+                        showMessage(data.message);
+                        closeModal('edit-process-modal');
+                        var projectId = document.getElementById('process-project-selector').value;
+                        window.location.href = buildURL({process_project_id: projectId, process_id: processId});
+                    } else {
+                        showMessage(data.message, 'error');
+                    }
+                } catch (e) {
+                    console.error('JSON parse error:', e);
+                    showMessage('Server response error. Check console for details.', 'error');
+                }
+            })
+            .catch(function(error) {
+                showMessage('Network error: ' + error.message, 'error');
+            });
+        }
+
         // Initialize process dropdown on page load if needed
         document.addEventListener('DOMContentLoaded', function() {
             // Resource form submission
@@ -1629,11 +2864,15 @@ try {
                 })
                 .then(function(data) {
                     if (data.success) {
-                        showMessage(data.message);
+                        showMessage(isEdit ? 'Resource updated successfully!' : 'Resource added successfully!', 'success');
                         closeModal('resource-modal');
-                        window.location.href = buildURL();
+                        
+                        // Refresh the page to show updated resources
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 1000);
                     } else {
-                        showMessage(data.message, 'error');
+                        showMessage('Error: ' + data.message, 'error');
                     }
                 })
                 .catch(function(error) {
@@ -1657,6 +2896,1118 @@ try {
                 }
             }
         };
+
+        // Table Enhancement Functions
+        function filterTable(tableId, searchValue) {
+            var table = document.getElementById(tableId);
+            var tbody = table.getElementsByTagName('tbody')[0];
+            var rows = tbody.getElementsByTagName('tr');
+            var visibleCount = 0;
+            
+            searchValue = searchValue.toLowerCase();
+            
+            for (var i = 0; i < rows.length; i++) {
+                var row = rows[i];
+                var cells = row.getElementsByTagName('td');
+                var found = false;
+                
+                for (var j = 0; j < cells.length; j++) {
+                    var cellText = cells[j].textContent || cells[j].innerText;
+                    if (cellText.toLowerCase().indexOf(searchValue) > -1) {
+                        found = true;
+                        break;
+                    }
+                }
+                
+                if (found || searchValue === '') {
+                    row.classList.remove('table-row-hidden');
+                    visibleCount++;
+                } else {
+                    row.classList.add('table-row-hidden');
+                }
+            }
+            
+            // Update count
+            var countElement = document.getElementById(tableId.replace('-table', '-count'));
+            if (countElement) {
+                countElement.textContent = visibleCount;
+            }
+            
+            // Show/hide no results message
+            var noResultsElement = document.getElementById(tableId.replace('-table', '-no-results'));
+            if (noResultsElement) {
+                noResultsElement.style.display = visibleCount === 0 ? 'block' : 'none';
+            }
+        }
+        
+        function filterTableByColumn(tableId, columnIndex, filterValue) {
+            var table = document.getElementById(tableId);
+            var tbody = table.getElementsByTagName('tbody')[0];
+            var rows = tbody.getElementsByTagName('tr');
+            var visibleCount = 0;
+            
+            filterValue = filterValue.toLowerCase();
+            
+            for (var i = 0; i < rows.length; i++) {
+                var row = rows[i];
+                var cells = row.getElementsByTagName('td');
+                
+                if (cells[columnIndex]) {
+                    var cellText = cells[columnIndex].textContent || cells[columnIndex].innerText;
+                    cellText = cellText.toLowerCase();
+                    
+                    if (filterValue === '' || cellText.indexOf(filterValue) > -1) {
+                        row.classList.remove('table-row-hidden');
+                        visibleCount++;
+                    } else {
+                        row.classList.add('table-row-hidden');
+                    }
+                }
+            }
+            
+            // Update count
+            var countElement = document.getElementById(tableId.replace('-table', '-count'));
+            if (countElement) {
+                countElement.textContent = visibleCount;
+            }
+            
+            // Show/hide no results message
+            var noResultsElement = document.getElementById(tableId.replace('-table', '-no-results'));
+            if (noResultsElement) {
+                noResultsElement.style.display = visibleCount === 0 ? 'block' : 'none';
+            }
+        }
+        
+        function sortTable(tableId, columnIndex) {
+            var table = document.getElementById(tableId);
+            var tbody = table.getElementsByTagName('tbody')[0];
+            var rows = Array.from(tbody.getElementsByTagName('tr'));
+            var header = table.getElementsByTagName('thead')[0].getElementsByTagName('tr')[0].getElementsByTagName('th')[columnIndex];
+            
+            // Determine sort direction
+            var isAsc = !header.classList.contains('sort-asc');
+            
+            // Clear all sort indicators
+            var headers = table.getElementsByTagName('thead')[0].getElementsByTagName('th');
+            for (var i = 0; i < headers.length; i++) {
+                headers[i].classList.remove('sort-asc', 'sort-desc');
+            }
+            
+            // Set current sort indicator
+            header.classList.add(isAsc ? 'sort-asc' : 'sort-desc');
+            
+            // Sort rows
+            rows.sort(function(a, b) {
+                var aText = a.getElementsByTagName('td')[columnIndex].textContent || a.getElementsByTagName('td')[columnIndex].innerText;
+                var bText = b.getElementsByTagName('td')[columnIndex].textContent || b.getElementsByTagName('td')[columnIndex].innerText;
+                
+                // Try to parse as numbers
+                var aNum = parseFloat(aText.replace(/[^0-9.-]/g, ''));
+                var bNum = parseFloat(bText.replace(/[^0-9.-]/g, ''));
+                
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                    return isAsc ? aNum - bNum : bNum - aNum;
+                } else {
+                    return isAsc ? aText.localeCompare(bText) : bText.localeCompare(aText);
+                }
+            });
+            
+            // Reorder rows in table
+            for (var i = 0; i < rows.length; i++) {
+                tbody.appendChild(rows[i]);
+            }
+        }
+        
+        // Update summary data based on selected project
+        function updateSummaryData() {
+            var projectId = document.getElementById('summary-project-selector').value;
+            var summaryContent = document.getElementById('summary-content');
+            
+            // Show loading state
+            summaryContent.innerHTML = '<div style="text-align: center; padding: 40px;">Loading summary data...</div>';
+            
+            // Fetch summary data
+            var url = window.location.href.split('?')[0] + '?action=get_summary_data';
+            if (projectId) {
+                url += '&project_id=' + projectId;
+            }
+            
+            fetch(url)
+            .then(function(response) {
+                return response.json();
+            })
+            .then(function(data) {
+                if (data.success) {
+                    var html = '';
+                    
+                    if (projectId) {
+                        // Project-specific summary
+                        html = '<div class="summary-grid">' +
+                            '<div class="summary-card">' +
+                                '<h3>' + data.data.project_assignments + '</h3>' +
+                                '<p>Project Assignments</p>' +
+                            '</div>' +
+                            '<div class="summary-card">' +
+                                '<h3>' + data.data.process_assignments + '</h3>' +
+                                '<p>Process Assignments</p>' +
+                            '</div>' +
+                            '<div class="summary-card">' +
+                                '<h3>$' + parseFloat(data.data.project_cost || 0).toFixed(2) + '</h3>' +
+                                '<p>Project Resource Cost/Hour</p>' +
+                            '</div>' +
+                            '<div class="summary-card">' +
+                                '<h3>$' + parseFloat(data.data.process_cost || 0).toFixed(2) + '</h3>' +
+                                '<p>Process Total Cost</p>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="card">' +
+                            '<div class="card-header">Project Summary: ' + data.data.project_name + '</div>' +
+                            '<div class="card-body">' +
+                                '<p>This summary shows resource allocation and costs specific to the selected project.</p>' +
+                                '<ul>' +
+                                    '<li><strong>Project Assignments:</strong> Direct resource assignments to the project</li>' +
+                                    '<li><strong>Process Assignments:</strong> Resource assignments to processes within this project</li>' +
+                                    '<li><strong>Project Resource Cost:</strong> Hourly cost of directly assigned resources</li>' +
+                                    '<li><strong>Process Total Cost:</strong> Total cost including duration for process assignments</li>' +
+                                '</ul>' +
+                            '</div>' +
+                        '</div>';
+                    } else {
+                        // Overall system summary
+                        html = '<div class="summary-grid">' +
+                            '<div class="summary-card">' +
+                                '<h3>' + data.data.total_resources + '</h3>' +
+                                '<p>Total Resources</p>' +
+                            '</div>' +
+                            '<div class="summary-card">' +
+                                '<h3>' + data.data.active_projects + '</h3>' +
+                                '<p>Active Projects</p>' +
+                            '</div>' +
+                            '<div class="summary-card">' +
+                                '<h3>' + data.data.available_processes + '</h3>' +
+                                '<p>Available Processes</p>' +
+                            '</div>' +
+                            '<div class="summary-card">' +
+                                '<h3>' + data.data.project_assignments + '</h3>' +
+                                '<p>Project Assignments</p>' +
+                            '</div>' +
+                            '<div class="summary-card">' +
+                                '<h3>' + data.data.process_assignments + '</h3>' +
+                                '<p>Process Assignments</p>' +
+                            '</div>' +
+                            '<div class="summary-card">' +
+                                '<h3>$' + parseFloat(data.data.total_hourly_cost || 0).toFixed(2) + '</h3>' +
+                                '<p>Total Hourly Cost</p>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="card">' +
+                            '<div class="card-header">Resource Type Distribution</div>' +
+                            '<div class="card-body">' +
+                                '<p>Overall system resource distribution and assignment statistics.</p>' +
+                            '</div>' +
+                        '</div>';
+                    }
+                    
+                    summaryContent.innerHTML = html;
+                } else {
+                    summaryContent.innerHTML = '<div class="status-message error">Error loading summary data: ' + data.message + '</div>';
+                }
+            })
+            .catch(function(error) {
+                summaryContent.innerHTML = '<div class="status-message error">Network error loading summary data.</div>';
+            });
+        }
+    </script>
+    
+    <!-- BPMN.js script -->
+    <script src="https://unpkg.com/bpmn-js@17.0.0/dist/bpmn-viewer.development.js"></script>
+    
+    <script>
+        // BPMN Viewer variables
+        let processBpmnViewer = null;
+        let currentProcessData = null;
+        let processAssignments = [];
+        
+        // Initialize BPMN Viewer when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeBPMNViewer();
+            
+            // Load process if one is already selected
+            const processSelector = document.getElementById('process-selector');
+            if (processSelector && processSelector.value) {
+                loadProcessInBPMNViewer(processSelector.value);
+            }
+        });
+        
+        // Initialize BPMN Viewer
+        function initializeBPMNViewer() {
+            try {
+                processBpmnViewer = new BpmnJS({
+                    container: '#process-bpmn-viewer'
+                });
+                console.log('✅ BPMN Viewer initialized successfully');
+            } catch (error) {
+                console.error('Failed to initialize BPMN Viewer:', error);
+                const loading = document.querySelector('#process-bpmn-viewer .loading');
+                if (loading) {
+                    loading.innerHTML = 'BPMN Viewer initialization failed: ' + error.message;
+                }
+            }
+        }
+        
+        // Load process in BPMN viewer
+        async function loadProcessInBPMNViewer(processId) {
+            if (!processBpmnViewer || !processId) return;
+            
+            try {
+                // Fetch process data
+                const response = await fetch(window.location.href.split('?')[0] + '?action=get_process_xml&process_id=' + processId);
+                const data = await response.json();
+                
+                if (data.success && data.xml) {
+                    await processBpmnViewer.importXML(data.xml);
+                    processBpmnViewer.get('canvas').zoom('fit-viewport');
+                    
+                    currentProcessData = data;
+                    
+                    // Hide loading indicator
+                    const loading = document.querySelector('#process-bpmn-viewer .loading');
+                    if (loading) {
+                        loading.style.display = 'none';
+                    }
+                    
+                    // Load assignments and add click handlers
+                    await loadProcessAssignments(processId);
+                    addTaskClickHandlers();
+                    highlightAssignedTasks();
+                    
+                } else {
+                    throw new Error(data.message || 'Failed to load process XML');
+                }
+                
+            } catch (error) {
+                console.error('Failed to load process in viewer:', error);
+                const loading = document.querySelector('#process-bpmn-viewer .loading');
+                if (loading) {
+                    loading.innerHTML = 'Failed to load process: ' + error.message;
+                }
+            }
+        }
+        
+        // Load process assignments for highlighting
+        async function loadProcessAssignments(processId) {
+            try {
+                const response = await fetch(window.location.href.split('?')[0] + '?action=get_process_assignments&process_id=' + processId);
+                const data = await response.json();
+                
+                if (data.success) {
+                    processAssignments = data.assignments || [];
+                    // Also populate the table with the same data
+                    populateProcessResourcesTable(processAssignments);
+                } else {
+                    processAssignments = [];
+                    populateProcessResourcesTable([]);
+                }
+            } catch (error) {
+                console.error('Failed to load process assignments:', error);
+                processAssignments = [];
+                populateProcessResourcesTable([]);
+            }
+        }
+        
+        // Populate process resources table using same data as diagram
+        function populateProcessResourcesTable(assignments) {
+            const tbody = document.getElementById('process-resources-tbody');
+            if (!tbody) return;
+            
+            if (!assignments || assignments.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: #666;">No assignments found.</td></tr>';
+                const countElement = document.getElementById('process-resources-count');
+                if (countElement) countElement.textContent = '0';
+                return;
+            }
+            
+            console.log('Populating table with assignments:', assignments.length);
+            
+            let html = '';
+            assignments.forEach(function(assignment, index) {
+                console.log(`Processing assignment ${index + 1}:`, {
+                    id: assignment.id,
+                    task_id: assignment.task_id,
+                    resource_name: assignment.resource_name,
+                    revision_ref: assignment.revision_ref,
+                    duration_minutes: assignment.duration_minutes
+                });
+                
+                const revRef = assignment.revision_ref || 'REV-001';
+                const badgeClass = getRevisionBadgeClass(revRef);
+                
+                // Get task name from BPMN data or use task_id as fallback
+                const taskName = getTaskNameFromBpmn(assignment.task_id) || assignment.task_id;
+                
+                html += `
+                    <tr>
+                        <td style="text-align: center;">
+                            <input type="checkbox" class="assignment-checkbox" value="${assignment.id}" onchange="updateMassDeleteButton()">
+                        </td>
+                        <td>
+                            <div style="font-weight: bold; color: #333; font-size: 14px;">${escapeHtml(taskName)}</div>
+                            <div style="font-size: 11px; color: #666;">Task ID: ${escapeHtml(assignment.task_id)}</div>
+                            <div style="font-size: 10px; color: #999;">Assignment #${assignment.id}</div>
+                        </td>
+                        <td>${escapeHtml(assignment.resource_name)}</td>
+                        <td><span class="badge badge-${escapeHtml(assignment.type || 'human')}">${escapeHtml(assignment.type || 'human')}</span></td>
+                        <td>${parseFloat(assignment.quantity_required || 1).toFixed(1)}</td>
+                        <td>${assignment.duration_minutes || 0} min</td>
+                        <td><span class="badge badge-${escapeHtml(assignment.complexity_level || 'medium')}">${escapeHtml(assignment.complexity_level || 'medium')}</span></td>
+                        <td><span class="badge badge-${escapeHtml(assignment.priority_level || 'medium')}">${escapeHtml(assignment.priority_level || 'medium')}</span></td>
+                        <td>
+                            <span class="badge ${badgeClass}">
+                                ${escapeHtml(revRef)}
+                            </span>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="editProcessAssignment(${assignment.id})">Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick="removeAssignment(${assignment.id}, 'process')">Remove</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            tbody.innerHTML = html;
+            
+            // Update assignment count
+            const countElement = document.getElementById('process-resources-count');
+            if (countElement) {
+                countElement.textContent = assignments.length;
+            }
+            
+            // Reset mass delete controls
+            const selectAllCheckbox = document.getElementById('select-all-assignments');
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            }
+            updateMassDeleteButton();
+            
+            console.log('Table populated successfully with', assignments.length, 'assignments');
+        }
+        
+        // Get task name from BPMN diagram data
+        function getTaskNameFromBpmn(taskId) {
+            // Check if processBpmnViewer exists and is properly initialized
+            if (typeof processBpmnViewer === 'undefined' || !processBpmnViewer) {
+                console.log('BPMN viewer not available for task name extraction');
+                return null;
+            }
+            
+            try {
+                const elementRegistry = processBpmnViewer.get('elementRegistry');
+                if (!elementRegistry) {
+                    console.log('Element registry not available in BPMN viewer');
+                    return null;
+                }
+                
+                const element = elementRegistry.get(taskId);
+                
+                if (element && element.businessObject) {
+                    const taskName = element.businessObject.name;
+                    if (taskName && taskName.trim()) {
+                        return taskName.trim();
+                    }
+                }
+            } catch (error) {
+                console.log('Could not get task name from BPMN for', taskId, ':', error.message);
+            }
+            
+            return null;
+        }
+        
+        // Helper function to escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // JavaScript version of PHP getRevisionBadgeClass function
+        function getRevisionBadgeClass(revisionRef) {
+            if (!revisionRef) return 'badge-default';
+            
+            const ref = revisionRef.toUpperCase();
+            if (ref.includes('REV-001')) return 'badge-rev-001';
+            if (ref.includes('REV-002')) return 'badge-rev-002';
+            if (ref.includes('REV-003')) return 'badge-rev-003';
+            if (ref.includes('SIM')) return 'badge-sim';
+            return 'badge-default';
+        }
+        
+        // Add click handlers to tasks for resource assignment
+        function addTaskClickHandlers() {
+            if (!processBpmnViewer) return;
+            
+            const canvas = processBpmnViewer.get('canvas');
+            const elementRegistry = processBpmnViewer.get('elementRegistry');
+            
+            // Get all task elements
+            const tasks = elementRegistry.filter(function(element) {
+                return element.type && (
+                    element.type.includes('Task') || 
+                    element.type === 'bpmn:UserTask' ||
+                    element.type === 'bpmn:ServiceTask' ||
+                    element.type === 'bpmn:ScriptTask' ||
+                    element.type === 'bpmn:ManualTask'
+                );
+            });
+            
+            // Add click handlers and styling
+            tasks.forEach(function(task) {
+                const gfx = canvas.getGraphics(task);
+                if (gfx) {
+                    // Add clickable styling
+                    gfx.classList.add('clickable-task');
+                    
+                    // Add click event
+                    gfx.addEventListener('click', function(event) {
+                        event.stopPropagation();
+                        handleTaskClick(task);
+                    });
+                }
+            });
+        }
+        
+        // Handle task click for resource assignment
+        function handleTaskClick(task) {
+            console.log('Task clicked:', task.id, task.businessObject);
+            
+            const taskId = task.id;
+            // Try multiple ways to get task name
+            let taskName = task.businessObject.name || 
+                          task.businessObject.$attrs?.name || 
+                          task.businessObject.get?.('name') ||
+                          task.id;
+            
+            console.log('Extracted task info:', { id: taskId, name: taskName, businessObject: task.businessObject });
+            
+            // Store the clicked task info globally for use after modal loads
+            window.clickedTaskInfo = { id: taskId, name: taskName };
+            
+            // Open process assignment modal with pre-selected task
+            openProcessModal();
+            
+            // Pre-select the clicked task and fill task name with longer delay
+            setTimeout(function() {
+                const taskSelect = document.getElementById('modal-task');
+                const taskNameField = document.getElementById('modal-task-name');
+                
+                console.log('Modal elements found:', { taskSelect: !!taskSelect, taskNameField: !!taskNameField });
+                console.log('Using stored task info:', window.clickedTaskInfo);
+                
+                if (taskSelect && window.clickedTaskInfo) {
+                    // First, directly add the clicked task to ensure it exists
+                    console.log('Adding clicked task directly to dropdown:', window.clickedTaskInfo);
+                    
+                    // Clear existing options and add the clicked task first
+                    taskSelect.innerHTML = '<option value="">Choose a task...</option>';
+                    
+                    // Add the clicked task
+                    const clickedOption = document.createElement('option');
+                    clickedOption.value = window.clickedTaskInfo.id;
+                    clickedOption.textContent = window.clickedTaskInfo.name;
+                    taskSelect.appendChild(clickedOption);
+                    
+                    // Now load other tasks from database
+                    const processId = document.getElementById('process-selector').value;
+                    console.log('Current process ID:', processId);
+                    
+                    if (processId) {
+                        // Load additional tasks from database
+                        fetch(window.location.pathname + '?action=get_tasks&process_id=' + processId)
+                        .then(function(response) {
+                            return response.json();
+                        })
+                        .then(function(tasks) {
+                            console.log('Database tasks loaded:', tasks);
+                            
+                            // Add database tasks (avoid duplicates)
+                            tasks.forEach(function(task) {
+                                // Check if task already exists
+                                let exists = false;
+                                for (let i = 0; i < taskSelect.options.length; i++) {
+                                    if (taskSelect.options[i].value === task.task_id) {
+                                        exists = true;
+                                        break;
+                                    }
+                                }
+                                
+                                if (!exists) {
+                                    const option = document.createElement('option');
+                                    option.value = task.task_id;
+                                    option.textContent = task.task_name || task.task_id;
+                                    taskSelect.appendChild(option);
+                                }
+                            });
+                            
+                            // Now select the clicked task
+                            taskSelect.value = window.clickedTaskInfo.id;
+                            console.log('Task selected:', taskSelect.value);
+                            
+                            // Fill task name field (even though it's hidden)
+                            if (taskNameField) {
+                                taskNameField.value = window.clickedTaskInfo.name;
+                            }
+                            
+                            // Trigger task selection to load duration
+                            const event = new Event('change');
+                            taskSelect.dispatchEvent(event);
+                            
+                            // Clear the stored info
+                            window.clickedTaskInfo = null;
+                        })
+                        .catch(function(error) {
+                            console.error('Error loading database tasks:', error);
+                            // Even if database loading fails, we still have the clicked task
+                            taskSelect.value = window.clickedTaskInfo.id;
+                            console.log('Using clicked task only:', taskSelect.value);
+                            
+                            if (taskNameField) {
+                                taskNameField.value = window.clickedTaskInfo.name;
+                            }
+                            
+                            window.clickedTaskInfo = null;
+                        });
+                    } else {
+                        // No process ID, just use the clicked task
+                        taskSelect.value = window.clickedTaskInfo.id;
+                        console.log('No process ID, using clicked task only:', taskSelect.value);
+                        
+                        if (taskNameField) {
+                            taskNameField.value = window.clickedTaskInfo.name;
+                        }
+                        
+                        window.clickedTaskInfo = null;
+                    }
+                } else {
+                    console.error('Modal elements not found or no clicked task info');
+                }
+            }, 1200); // Increased timeout further
+        }
+        
+        // Highlight assigned tasks with colors based on Rev/Ref#
+        function highlightAssignedTasks() {
+            if (!processBpmnViewer || !processAssignments) return;
+            
+            const canvas = processBpmnViewer.get('canvas');
+            const elementRegistry = processBpmnViewer.get('elementRegistry');
+            
+            // Group assignments by task_id
+            const taskAssignments = {};
+            processAssignments.forEach(function(assignment) {
+                if (!taskAssignments[assignment.task_id]) {
+                    taskAssignments[assignment.task_id] = [];
+                }
+                taskAssignments[assignment.task_id].push(assignment);
+            });
+            
+            // Apply highlighting to each assigned task
+            Object.keys(taskAssignments).forEach(function(taskId) {
+                const element = elementRegistry.get(taskId);
+                if (element) {
+                    const gfx = canvas.getGraphics(element);
+                    if (gfx) {
+                        // Remove existing assignment classes
+                        gfx.classList.remove('assigned-task', 'assigned-task-rev1', 'assigned-task-rev2', 'assigned-task-sim');
+                        
+                        // Get unique Rev/Ref# values for this task
+                        const revRefs = [...new Set(taskAssignments[taskId].map(a => a.revision_ref))];
+                        
+                        if (revRefs.length > 0) {
+                            // Apply color based on Rev/Ref# pattern
+                            if (revRefs.some(ref => ref && ref.includes('REV-001'))) {
+                                gfx.classList.add('assigned-task-rev1');
+                            } else if (revRefs.some(ref => ref && ref.includes('REV-002'))) {
+                                gfx.classList.add('assigned-task-rev2');
+                            } else if (revRefs.some(ref => ref && ref.includes('SIM'))) {
+                                gfx.classList.add('assigned-task-sim');
+                            } else {
+                                gfx.classList.add('assigned-task');
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Update legend after highlighting
+            updateRevRefLegend();
+        }
+        
+        // Update Rev/Ref# legend with available revisions
+        function updateRevRefLegend() {
+            if (!processAssignments) return;
+            
+            const legendContainer = document.getElementById('rev-ref-legend');
+            const loadingElement = document.getElementById('legend-loading');
+            
+            if (!legendContainer) return;
+            
+            // Get unique Rev/Ref# values
+            const revRefs = [...new Set(processAssignments.map(a => a.revision_ref).filter(ref => ref))];
+            
+            // Clear loading message
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+            
+            // Remove existing legend items (except "All Assignments")
+            const existingItems = legendContainer.querySelectorAll('.legend-item:not(:first-child)');
+            existingItems.forEach(item => item.remove());
+            
+            // Add legend items for each Rev/Ref#
+            revRefs.forEach(function(revRef) {
+                const legendItem = document.createElement('div');
+                legendItem.className = 'legend-item';
+                legendItem.onclick = function() { highlightRevRef(revRef); };
+                legendItem.style.cssText = 'cursor: pointer; padding: 8px 12px; border: 2px solid #ccc; border-radius: 5px; font-size: 12px; font-weight: bold; transition: all 0.2s;';
+                
+                // Set color based on Rev/Ref# pattern
+                let color = '#28a745'; // default green
+                let bgColor = 'rgba(40, 167, 69, 0.1)';
+                
+                if (revRef.includes('REV-001')) {
+                    color = '#007bff';
+                    bgColor = 'rgba(0, 123, 255, 0.1)';
+                } else if (revRef.includes('REV-002')) {
+                    color = '#dc3545';
+                    bgColor = 'rgba(220, 53, 69, 0.1)';
+                } else if (revRef.includes('SIM')) {
+                    color = '#ffc107';
+                    bgColor = 'rgba(255, 193, 7, 0.1)';
+                }
+                
+                legendItem.style.borderColor = color;
+                legendItem.style.backgroundColor = bgColor;
+                
+                legendItem.innerHTML = '<span style="color: ' + color + ';">■</span> ' + revRef;
+                
+                legendContainer.appendChild(legendItem);
+            });
+            
+            // Show message if no assignments
+            if (revRefs.length === 0) {
+                const noAssignments = document.createElement('div');
+                noAssignments.style.cssText = 'color: #666; font-style: italic;';
+                noAssignments.textContent = 'No assignments found for this process';
+                legendContainer.appendChild(noAssignments);
+            }
+        }
+        
+        // Highlight tasks for specific Rev/Ref# or show all
+        function highlightRevRef(targetRevRef) {
+            if (!processBpmnViewer || !processAssignments) return;
+            
+            const canvas = processBpmnViewer.get('canvas');
+            const elementRegistry = processBpmnViewer.get('elementRegistry');
+            
+            // Update legend item styling
+            const legendItems = document.querySelectorAll('.legend-item');
+            legendItems.forEach(function(item) {
+                item.style.opacity = '0.5';
+                item.style.transform = 'scale(0.95)';
+            });
+            
+            // Highlight selected legend item
+            const selectedItem = Array.from(legendItems).find(item => 
+                (targetRevRef === '' && item.textContent.includes('All Assignments')) ||
+                (targetRevRef !== '' && item.textContent.includes(targetRevRef))
+            );
+            if (selectedItem) {
+                selectedItem.style.opacity = '1';
+                selectedItem.style.transform = 'scale(1)';
+            }
+            
+            // Group assignments by task_id
+            const taskAssignments = {};
+            processAssignments.forEach(function(assignment) {
+                if (!taskAssignments[assignment.task_id]) {
+                    taskAssignments[assignment.task_id] = [];
+                }
+                taskAssignments[assignment.task_id].push(assignment);
+            });
+            
+            // Apply highlighting to tasks
+            Object.keys(taskAssignments).forEach(function(taskId) {
+                const element = elementRegistry.get(taskId);
+                if (element) {
+                    const gfx = canvas.getGraphics(element);
+                    if (gfx) {
+                        // Remove all assignment classes
+                        gfx.classList.remove('assigned-task', 'assigned-task-rev1', 'assigned-task-rev2', 'assigned-task-sim');
+                        
+                        const taskRevRefs = taskAssignments[taskId].map(a => a.revision_ref);
+                        
+                        if (targetRevRef === '') {
+                            // Show all assignments (original behavior)
+                            const revRefs = [...new Set(taskRevRefs)];
+                            if (revRefs.length > 0) {
+                                if (revRefs.some(ref => ref && ref.includes('REV-001'))) {
+                                    gfx.classList.add('assigned-task-rev1');
+                                } else if (revRefs.some(ref => ref && ref.includes('REV-002'))) {
+                                    gfx.classList.add('assigned-task-rev2');
+                                } else if (revRefs.some(ref => ref && ref.includes('SIM'))) {
+                                    gfx.classList.add('assigned-task-sim');
+                                } else {
+                                    gfx.classList.add('assigned-task');
+                                }
+                            }
+                        } else {
+                            // Show only specific Rev/Ref#
+                            if (taskRevRefs.includes(targetRevRef)) {
+                                if (targetRevRef.includes('REV-001')) {
+                                    gfx.classList.add('assigned-task-rev1');
+                                } else if (targetRevRef.includes('REV-002')) {
+                                    gfx.classList.add('assigned-task-rev2');
+                                } else if (targetRevRef.includes('SIM')) {
+                                    gfx.classList.add('assigned-task-sim');
+                                } else {
+                                    gfx.classList.add('assigned-task');
+                                }
+                            }
+                            // Tasks without the target Rev/Ref# remain uncolored
+                        }
+                    }
+                }
+            });
+            
+            // Filter table rows based on selected revision
+            filterTableByRevision(targetRevRef);
+        }
+        
+        // Filter table rows by revision reference
+        function filterTableByRevision(targetRevRef) {
+            const table = document.getElementById('process-resources-table');
+            if (!table) return;
+            
+            const rows = table.querySelectorAll('tbody tr');
+            let visibleCount = 0;
+            
+            rows.forEach(function(row) {
+                const revCell = row.querySelector('td:nth-child(8)'); // Rev/Ref# column
+                if (revCell) {
+                    const revText = revCell.textContent.trim();
+                    
+                    if (targetRevRef === '' || revText.includes(targetRevRef)) {
+                        row.style.display = '';
+                        visibleCount++;
+                    } else {
+                        row.style.display = 'none';
+                    }
+                }
+            });
+            
+            // Update the assignment count
+            const countElement = document.getElementById('process-resources-count');
+            if (countElement) {
+                countElement.textContent = visibleCount;
+            }
+            
+            // Update the revision filter dropdown to match
+            const revisionFilter = document.querySelector('select[onchange*="filterTableByColumn"]');
+            if (revisionFilter) {
+                if (targetRevRef === '') {
+                    revisionFilter.value = '';
+                } else {
+                    // Find matching option
+                    const options = revisionFilter.querySelectorAll('option');
+                    options.forEach(option => {
+                        if (option.value === targetRevRef) {
+                            revisionFilter.value = targetRevRef;
+                        }
+                    });
+                }
+            }
+        }
+        
+        // Refresh process resources data from database
+        function refreshProcessResources() {
+            const processSelector = document.getElementById('process-selector');
+            if (!processSelector || !processSelector.value) {
+                showMessage('Please select a process first', 'error');
+                return;
+            }
+            
+            console.log('Refreshing process resources data...');
+            
+            // Show loading indicator
+            const tbody = document.getElementById('process-resources-tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: #666;">Refreshing data...</td></tr>';
+            }
+            
+            // Reload data using same AJAX source as diagram
+            loadProcessAssignments(processSelector.value);
+        }
+        
+        // Retrieve assignments with detailed debugging information
+        async function retrieveAssignments() {
+            const processSelector = document.getElementById('process-selector');
+            if (!processSelector || !processSelector.value) {
+                showMessage('Please select a process first', 'error');
+                return;
+            }
+            
+            console.log('=== RETRIEVE ASSIGNMENTS DEBUG ===');
+            console.log('Process ID:', processSelector.value);
+            
+            // Show loading indicator
+            const tbody = document.getElementById('process-resources-tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: #666;">Retrieving assignments from database...</td></tr>';
+            }
+            
+            try {
+                const url = window.location.href.split('?')[0] + '?action=get_process_assignments&process_id=' + processSelector.value + '&debug=1&timestamp=' + Date.now();
+                console.log('Fetching from URL:', url);
+                
+                const response = await fetch(url);
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+                
+                const data = await response.json();
+                console.log('Raw response data:', data);
+                
+                if (data.success) {
+                    const assignments = data.assignments || [];
+                    console.log('Number of assignments retrieved:', assignments.length);
+                    
+                    // Log each assignment in detail
+                    assignments.forEach((assignment, index) => {
+                        console.log(`Assignment ${index + 1}:`, {
+                            id: assignment.id,
+                            task_id: assignment.task_id,
+                            resource_name: assignment.resource_name,
+                            revision_ref: assignment.revision_ref,
+                            duration_minutes: assignment.duration_minutes,
+                            assigned_date: assignment.assigned_date
+                        });
+                    });
+                    
+                    // Update global variable and populate table
+                    processAssignments = assignments;
+                    populateProcessResourcesTable(assignments);
+                    
+                    // Show success message with count
+                    showMessage(`Successfully retrieved ${assignments.length} assignments from database`, 'success');
+                    
+                    // Also update diagram highlighting
+                    if (typeof updateProcessHighlighting === 'function') {
+                        updateProcessHighlighting();
+                    }
+                    
+                } else {
+                    console.error('Failed to retrieve assignments:', data.message);
+                    showMessage('Failed to retrieve assignments: ' + (data.message || 'Unknown error'), 'error');
+                    
+                    // Show empty table
+                    populateProcessResourcesTable([]);
+                }
+                
+            } catch (error) {
+                console.error('Error retrieving assignments:', error);
+                showMessage('Network error retrieving assignments: ' + error.message, 'error');
+                
+                // Show error in table
+                if (tbody) {
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: #d32f2f;">Error retrieving assignments. Check console for details.</td></tr>';
+                }
+            }
+            
+            console.log('=== END RETRIEVE ASSIGNMENTS DEBUG ===');
+        }
+        
+        // Mass delete functionality
+        function toggleSelectAll() {
+            const selectAllCheckbox = document.getElementById('select-all-assignments');
+            const assignmentCheckboxes = document.querySelectorAll('.assignment-checkbox');
+            
+            assignmentCheckboxes.forEach(checkbox => {
+                checkbox.checked = selectAllCheckbox.checked;
+            });
+            
+            updateMassDeleteButton();
+        }
+        
+        function updateMassDeleteButton() {
+            const selectedCheckboxes = document.querySelectorAll('.assignment-checkbox:checked');
+            const massDeleteBtn = document.getElementById('mass-delete-btn');
+            const selectedCount = document.getElementById('selected-count');
+            const selectAllCheckbox = document.getElementById('select-all-assignments');
+            const allCheckboxes = document.querySelectorAll('.assignment-checkbox');
+            
+            if (selectedCheckboxes.length > 0) {
+                massDeleteBtn.style.display = 'inline-block';
+                selectedCount.textContent = selectedCheckboxes.length;
+            } else {
+                massDeleteBtn.style.display = 'none';
+            }
+            
+            // Update select all checkbox state
+            if (selectedCheckboxes.length === allCheckboxes.length && allCheckboxes.length > 0) {
+                selectAllCheckbox.checked = true;
+                selectAllCheckbox.indeterminate = false;
+            } else if (selectedCheckboxes.length > 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = true;
+            } else {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            }
+        }
+        
+        async function massDeleteAssignments() {
+            const selectedCheckboxes = document.querySelectorAll('.assignment-checkbox:checked');
+            
+            if (selectedCheckboxes.length === 0) {
+                showMessage('No assignments selected for deletion', 'error');
+                return;
+            }
+            
+            const assignmentIds = Array.from(selectedCheckboxes).map(cb => cb.value);
+            const confirmMessage = `Are you sure you want to delete ${assignmentIds.length} selected assignment(s)?\n\nThis action cannot be undone.`;
+            
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+            
+            try {
+                console.log('Deleting assignments:', assignmentIds);
+                
+                const formData = new FormData();
+                formData.append('action', 'mass_delete_assignments');
+                formData.append('assignment_ids', JSON.stringify(assignmentIds));
+                
+                const response = await fetch(window.location.href.split('?')[0], {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage(`Successfully deleted ${assignmentIds.length} assignment(s)`, 'success');
+                    
+                    // Refresh the table and diagram
+                    const processSelector = document.getElementById('process-selector');
+                    if (processSelector && processSelector.value) {
+                        await loadProcessAssignments(processSelector.value);
+                        highlightAssignedTasks();
+                    }
+                    
+                    // Reset checkboxes
+                    document.getElementById('select-all-assignments').checked = false;
+                    updateMassDeleteButton();
+                    
+                } else {
+                    showMessage('Failed to delete assignments: ' + (data.message || 'Unknown error'), 'error');
+                }
+                
+            } catch (error) {
+                console.error('Mass delete error:', error);
+                showMessage('Error deleting assignments: ' + error.message, 'error');
+            }
+        }
+        
+        // Override the existing loadProcessResources function to also load BPMN viewer
+        const originalLoadProcessResources = window.loadProcessResources;
+        window.loadProcessResources = function() {
+            if (originalLoadProcessResources) {
+                originalLoadProcessResources();
+            }
+            
+            // Load BPMN viewer for selected process
+            const processSelector = document.getElementById('process-selector');
+            if (processSelector && processSelector.value) {
+                loadProcessInBPMNViewer(processSelector.value);
+            }
+        };
+        
+        // Modal drag functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Page loaded, checking for selected process...');
+            
+            // Initialize assignments for selected process
+            const processSelector = document.getElementById('process-selector');
+            if (processSelector && processSelector.value) {
+                console.log('Found selected process on page load:', processSelector.value);
+                
+                // Wait a bit for BPMN viewer to initialize, then load assignments
+                setTimeout(function() {
+                    console.log('Loading assignments for selected process...');
+                    loadProcessAssignments(processSelector.value);
+                }, 1000);
+            } else {
+                console.log('No process selected on page load');
+            }
+            
+            const modals = document.querySelectorAll('.modal-content');
+            
+            modals.forEach(function(modal) {
+                let isDragging = false;
+                let currentX;
+                let currentY;
+                let initialX;
+                let initialY;
+                let xOffset = 0;
+                let yOffset = 0;
+                
+                const header = modal.querySelector('.modal-header');
+                if (header) {
+                    header.addEventListener('mousedown', dragStart);
+                }
+                
+                function dragStart(e) {
+                    if (e.target.classList.contains('close')) return;
+                    
+                    initialX = e.clientX - xOffset;
+                    initialY = e.clientY - yOffset;
+                    
+                    if (e.target === header || header.contains(e.target)) {
+                        isDragging = true;
+                        modal.style.position = 'fixed';
+                        modal.style.margin = '0';
+                    }
+                }
+                
+                document.addEventListener('mousemove', drag);
+                document.addEventListener('mouseup', dragEnd);
+                
+                function drag(e) {
+                    if (isDragging) {
+                        e.preventDefault();
+                        currentX = e.clientX - initialX;
+                        currentY = e.clientY - initialY;
+                        
+                        xOffset = currentX;
+                        yOffset = currentY;
+                        
+                        // Keep modal within viewport bounds
+                        const rect = modal.getBoundingClientRect();
+                        const maxX = window.innerWidth - rect.width;
+                        const maxY = window.innerHeight - rect.height;
+                        
+                        xOffset = Math.max(0, Math.min(xOffset, maxX));
+                        yOffset = Math.max(0, Math.min(yOffset, maxY));
+                        
+                        modal.style.transform = 'translate(' + xOffset + 'px, ' + yOffset + 'px)';
+                    }
+                }
+                
+                function dragEnd(e) {
+                    initialX = currentX;
+                    initialY = currentY;
+                    isDragging = false;
+                }
+            });
+        });
     </script>
 </body>
 </html>
